@@ -1,4 +1,4 @@
-import { GetUrl } from "./utils.ts";
+import { GetUrl,GetUrlPath } from "./utils.ts";
 interface NavbarButton {
     id: string;
     label: string;
@@ -20,8 +20,9 @@ export const xmlNavbarButtons: XMLNavbarButtons = {
         image: 'images/1.svg',
         onAction: () => {
             const tsId = window._Application.PluginStorage.getItem('task_pane_id');
+            console.log(GetUrlPath() + '/article-optimization')
             if (!tsId) {
-                const taskPane = window._Application.CreateTaskPane(GetUrl() + '/article-optimization');
+                const taskPane = window._Application.CreateTaskPane(GetUrlPath() + '/article-optimization');
                 window._Application.PluginStorage.setItem('task_pane_id', taskPane.ID);
                 taskPane.Visible = true;
             } else {
@@ -78,4 +79,4 @@ export const xmlNavbarButtons: XMLNavbarButtons = {
     }
 };
 
-export const xmlNavbarButtonsArr = Object.keys(xmlNavbarButtons).map(key=>xmlNavbarButtons[key]);
+export const xmlNavbarButtonsArr = Object.keys(xmlNavbarButtons).map(key => xmlNavbarButtons[key]);
