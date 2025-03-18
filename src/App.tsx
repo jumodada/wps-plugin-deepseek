@@ -1,16 +1,12 @@
-import { useEffect } from 'react'
-import { RouterProvider } from 'react-router-dom'
-import './App.css'
-import ribbon from './wpsjs'
-import router from './route'
+import { ConfigProvider } from 'antd';
+import { Outlet } from 'react-router-dom';
+import './App.css';
+import zhCN from "antd/es/locale/zh_CN";
 
-function App() {
-  useEffect(() => {
-    window.ribbon = ribbon;
-    window._Application = window.Application //todo: 移除
-  })
-
-  return <RouterProvider router={router} />;
+export default function App() {
+  return (
+    <ConfigProvider  locale={zhCN}>
+      <Outlet />
+    </ConfigProvider>
+  );
 }
-
-export default App

@@ -12,11 +12,11 @@ export interface ApiResponse<T> {
 }
 
 export const apiClient = axios.create({
-  baseURL: '/',
+  baseURL: import.meta.env.VITE_API_BASE_URL_AI,
   timeout: 10000,
   headers: {
-    'Content-Type': 'application/xml',
-    'Accept': 'application/xml'
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`
   },
 });
 

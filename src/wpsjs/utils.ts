@@ -1,4 +1,3 @@
-
 function GetUrlPath() {
     // 在本地网页的情况下获取路径
     if (window.location.protocol === 'file:') {
@@ -25,8 +24,20 @@ function GetUrl() {
     return  GetUrlPath() + GetRouterHash();
 }
 
+function OpenDialog(title: string, width?: number, height?: number) {
+    const dialogUrl = `${GetUrl()}/dialog`;
+    return window._Application.ShowDialog(
+        dialogUrl,  
+        title,
+        width || 400 * window.devicePixelRatio,
+        height || 400 * window.devicePixelRatio,
+        false
+    );
+}
+
 export {
     GetUrlPath,
     GetRouterHash,
-    GetUrl
+    GetUrl,
+    OpenDialog
 }

@@ -24,7 +24,9 @@ declare global {
         ribbon: typeof import('../wpsjs').default;
         openOfficeFileFromSystemDemo: any
         InvokeFromSystemDemo: any
+        Application: import('wps-jsapi-declare').WpsApplication;
     }
+    type  WpsApplication = import('wps-jsapi-declare').WpsApplicationc
 }
 
 declare module '@/wpsjs/tool/util' {
@@ -41,4 +43,16 @@ declare module '@/wpsjs/tool/systemdemo' {
   export default SystemDemo;
 }
 
-export {};
+declare module 'wps-jsapi-declare' {
+    export = WpsApplication;
+}
+
+export {WpsApplication};
+
+declare interface WpsApplication {
+    ActiveDocument: {
+        WordOpenXML: string;
+        // 可以根据需要添加其他属性和方法
+    };
+    // 其他WPS API成员...
+}

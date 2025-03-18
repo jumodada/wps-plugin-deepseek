@@ -24,6 +24,8 @@ interface AppState {
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   setLoading: (loading: boolean) => void;
+  wps: WpsApplication | null;
+  setWps: (wps: WpsApplication | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -34,10 +36,12 @@ export const useAppStore = create<AppState>()(
         user: null,
         token: null,
         loading: false,
+        wps: null,
         setUser: (user) => set({ user }),
         setToken: (token) => set({ token }),
         setLoading: (loading) => set({ loading }),
         setData: (data) => set({ data }),
+        setWps: (wps) => set({ wps }),
       }),
       {
         name: 'app-storage',
