@@ -19,8 +19,8 @@ export const xmlNavbarButtons: XMLNavbarButtons = {
         label: '显示弹窗消息',
         image: 'images/1.svg',
         onAction: () => {
+            console.log(window._Application)
             const tsId = window._Application.PluginStorage.getItem('task_pane_id');
-            console.log(GetUrlPath() + '/article-optimization')
             if (!tsId) {
                 const taskPane = window._Application.CreateTaskPane(GetUrlPath() + '/article-optimization');
                 window._Application.PluginStorage.setItem('task_pane_id', taskPane.ID);

@@ -1,10 +1,8 @@
 import { Button, Card } from 'antd';
-import { useAppStore } from '../services/store';
 
 const ArticleOptimizationPage = () => {
-    const { wps } = useAppStore();
     const handleOptimizeAll = () => {
-       console.log(wps)
+        console.log(window._Application.ActiveDocument.WordOpenXML)
     }
     return (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'start', height: '100vh' }}>
@@ -12,6 +10,7 @@ const ArticleOptimizationPage = () => {
                 <p>选择需要优化的段落，点击按钮即可智能优化文章表达</p>
                 <Button 
                     type="primary" 
+                    onClick={handleOptimizeAll}
                 >
                     优化选中段落
                 </Button>
