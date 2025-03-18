@@ -14,17 +14,20 @@ interface XMLNavbarButtons {
 }
 
 export const xmlNavbarButtons: XMLNavbarButtons = {
-    showMessage: {
-        id: 'showMessage',
+    articleOptimization: {
+        id: 'articleOptimization',
         label: '显示弹窗消息',
         image: 'images/1.svg',
         onAction: () => {
-            const doc = window.Application.ActiveDocument;
-            if (!doc) {
-                alert('当前没有打开任何文档');
-                return;
+            const tsId = window._Application.PluginStorage.getItem('task_pane_id');
+            if (!tsId) {
+                const taskPane = window._Application.CreateTaskPane(GetUrl() + '/article-optimization');
+                window._Application.PluginStorage.setItem('task_pane_id', taskPane.ID);
+                taskPane.Visible = true;
+            } else {
+                const taskPane = window._Application.GetTaskPane(tsId);
+                taskPane.Visible = !taskPane.Visible;
             }
-            alert(doc.Name);
         }
     },
     showDialog: {

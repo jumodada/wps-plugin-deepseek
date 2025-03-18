@@ -7,6 +7,7 @@ import router from './route'
 function App() {
   useEffect(() => {
     window.ribbon = ribbon;
+    window._Application = window.Application //todo: 移除
   })
 
   return <RouterProvider router={router} />;
