@@ -12,8 +12,8 @@ export interface ApiResponse<T> {
 }
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL_AI,
-  timeout: 10000,
+  baseURL: '/',
+  timeout: 1000000,
   headers: {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY}`
@@ -22,16 +22,8 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    const { token } = useAppStore.getState();
     const { setLoading } = useAppStore.getState();
-
-      setLoading(true);
-
-    if (token) {
-      config.headers.Authorization = `${token}`;
-    } else {
-      delete config.headers.Authorization;
-    }
+    setLoading(true);
     return config;
   },
   (error) => {

@@ -1,29 +1,28 @@
 import { useState } from 'react';
 import { Button, Card, message } from 'antd';
 import { submitOptimization } from '../api/deepseek';
-
+import { xx } from './xx'
 const ArticleOptimizationPage = () => {
     const [loading, setLoading] = useState(false);
     
     const handleOptimizeAll = async () => {
         try {
             setLoading(true);
-            const articleContent = window._Application.ActiveDocument.WordOpenXML;
-            
-            // 构造符合DeepSeek API要求的请求参数
+            // const articleContent = window._Application.ActiveDocument.WordOpenXML;
+            const articleContent = xx
+            console.log(articleContent)
             const params = {
                 messages: [{
                     role: "user",
-                    content: `请润色以下文章，保持原有格式和结构，只返回优化后的内容,用同样的xml格式：\n\n${articleContent}`
+                    content: `你好`
                 }],
                 model: "deepseek-chat",
                 temperature: 0.7
             };
-
+            console.log(articleContent)
             const response: any = await submitOptimization(params as  any);
             
             if (response.data.status === 'completed') {
-                // 将优化后的内容写回Word文档
                 window._Application.ActiveDocument.Content = response.data.result;
                 message.success('文章优化成功！');
             } else {

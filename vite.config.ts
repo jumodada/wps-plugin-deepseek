@@ -4,16 +4,17 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-
+  console.log(env.VITE_DEEPSEEK_API_BASEURL)
   return {
-    base: './',
+    base: '/',
     plugins: [react()],
     server: {
-      host: '0.0.0.0',
+      host:'0.0.0.0',
       proxy: {
-        '/api': {
-          target: env.VITE_API_BASE_URL,
+        '/v1': {
+          target: env.VITE_DEEPSEEK_API_BASEURL,
           changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/v1/, '')
         },
         '/ai': {
           target: env.VITE_API_BASE_URL_AI,
