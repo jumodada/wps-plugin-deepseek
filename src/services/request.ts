@@ -40,6 +40,12 @@ apiClient.interceptors.response.use(
     const { setLoading } = useAppStore.getState();
     setLoading(false);
 
+    // 检查是否是请求取消的错误
+    if (axios.isCancel(error) || error.name === 'AbortError' || error.name === 'CanceledError') {
+      // 请求被取消，不显示错误消息
+      return Promise.reject(error);
+    }
+
     message.error(error.response?.data?.message || '请求失败');
     return Promise.reject(error.response);
   },

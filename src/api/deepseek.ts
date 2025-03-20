@@ -46,7 +46,7 @@ export const submitOptimization = (params: DeepSeekRequest) => {
     messages: params.messages,
     model: params.model || "deepseek-chat",
     temperature: params.temperature || 0.5,
-    stream: false // 明确关闭流式传输
+    stream: false
   }, {
     signal: params.signal // 传递中断信号
   });

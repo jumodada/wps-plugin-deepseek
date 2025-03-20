@@ -2,19 +2,16 @@ import { useState, useRef } from 'react';
 import { Button, Card, message, Progress, InputNumber, Slider, Switch, Row, Col, Tooltip } from 'antd';
 import { QuestionCircleOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons';
 import { submitOptimization } from '../api/deepseek';
+import { xx }    from './xx.js';
 
-
-// 将XML文本内容转换为纯文本
 const extractTextFromXML = (xmlContent: string): string => {
     try {
-        // 简单的移除所有XML标签，保留文本内容
         const textContent = xmlContent.replace(/<[^>]*>/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
         return textContent;
     } catch (error) {
-        console.error('XML解析错误:', error);
-        return xmlContent; // 如果解析失败，返回原始内容
+        return xmlContent;
     }
 };
 
@@ -23,11 +20,8 @@ const isXMLContent = (content: string): boolean => {
     return content.trim().startsWith('<?xml') || content.trim().startsWith('<w:');
 };
 
-// 将文本分成较小的段落，每段大约包含指定字符数
 const splitTextIntoChunks = (text: string, chunkSize: number = 3000): string[] => {
-    // 检查是否为XML内容
     if (isXMLContent(text)) {
-        // 如果是XML，提取纯文本
         const plainText = extractTextFromXML(text);
         return splitPlainTextIntoChunks(plainText, chunkSize);
     }
@@ -245,8 +239,8 @@ const ArticleOptimizationPage = () => {
             
             setLoading(true);
             setProgress(0);
-            const articleContent = window._Application.ActiveDocument.WordOpenXML;
-            //const articleContent = xx;
+            //const articleContent = window._Application.ActiveDocument.WordOpenXML;
+            const articleContent = xx;
             
             if (!articleContent || articleContent.trim() === '') {
                 message.warning('文档内容为空，无法进行优化');
