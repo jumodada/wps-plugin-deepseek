@@ -16,7 +16,24 @@ interface XMLNavbarButtons {
 export const xmlNavbarButtons: XMLNavbarButtons = {
     articleOptimization: {
         id: 'articleOptimization',
-        label: '显示弹窗消息',
+        label: '文章优化',
+        image: 'images/1.svg',
+        onAction: () => {
+            console.log(window._Application)
+            const tsId = window._Application.PluginStorage.getItem('task_pane_id');
+            if (!tsId) {
+                const taskPane = window._Application.CreateTaskPane(GetUrlPath() + '/article-optimization');
+                window._Application.PluginStorage.setItem('task_pane_id', taskPane.ID);
+                taskPane.Visible = true;
+            } else {
+                const taskPane = window._Application.GetTaskPane(tsId);
+                taskPane.Visible = !taskPane.Visible;
+            }
+        }
+    },
+    selectionOptimization:{
+        id: 'selectionOptimization',
+        label: '段落优化',
         image: 'images/1.svg',
         onAction: () => {
             console.log(window._Application)

@@ -1,17 +1,20 @@
 import { useState, useRef } from 'react';
-import { Button, Card, message, Progress, InputNumber, Slider, Switch, Row, Col, Tooltip } from 'antd';
-import { QuestionCircleOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons';
+import { Button, message, Progress } from 'antd';
+import { StopOutlined } from '@ant-design/icons';
 import { submitOptimization } from '../api/deepseek';
-import { xx }    from './xx.js';
+import { xx } from './xx.js';
 
+// 将XML文本内容转换为纯文本
 const extractTextFromXML = (xmlContent: string): string => {
     try {
+        // 简单的移除所有XML标签，保留文本内容
         const textContent = xmlContent.replace(/<[^>]*>/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
         return textContent;
     } catch (error) {
-        return xmlContent;
+        console.error('XML解析错误:', error);
+        return xmlContent; // 如果解析失败，返回原始内容
     }
 };
 
@@ -145,13 +148,10 @@ const ArticleOptimizationPage = () => {
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [processingStatus, setProcessingStatus] = useState('');
-    const [showAdvanced, setShowAdvanced] = useState(false);
     
-    // 高级配置选项
-    const [chunkSize, setChunkSize] = useState(2000); // 默认降低到2000以适应token限制
-    const [temperature, setTemperature] = useState(0.7);
-    const [preserveFormatting, setPreserveFormatting] = useState(true);
-    const [isProcessingXML, setIsProcessingXML] = useState(false);
+    const chunkSize = 2000; // 默认块大小
+    const temperature = 0.7; // 默认温度值
+    const preserveFormatting = true; // 默认保持原文格式
     
     // 用于跟踪和取消请求的引用
     const cancelTokenRef = useRef<AbortController | null>(null);
@@ -170,68 +170,7 @@ const ArticleOptimizationPage = () => {
         setProgress(0);
     };
     
-    const handleOptimizeSelection = async () => {
-        try {
-            // 创建新的取消控制器
-            cancelTokenRef.current = new AbortController();
-            processingRef.current = true;
-            
-            setLoading(true);
-            // 获取选中的文本
-            const selectedContent = window._Application.Selection.Text;
-            if (!selectedContent || selectedContent.trim() === '') {
-                message.warning('请先选择需要优化的文本内容');
-                setLoading(false);
-                return;
-            }
-            
-            setProcessingStatus('正在处理选中段落...');
-            
-            // 检查是否为XML内容
-            const isXML = isXMLContent(selectedContent);
-            setIsProcessingXML(isXML);
-            
-            // 如果是XML，提取文本
-            const contentToProcess = isXML ? extractTextFromXML(selectedContent) : selectedContent;
-            
-            const formatInstruction = preserveFormatting ? '，保持原意和格式' : '，保持原意';
-            
-            const params = {
-                messages: [{
-                    role: "user",
-                    content: `请对以下段落内容进行优化，提升其表达质量和专业度${formatInstruction}：\n\n${contentToProcess}`
-                }],
-                model: "deepseek-chat",
-                temperature: temperature,
-                signal: cancelTokenRef.current.signal
-            };
-            
-            const response = await retryOptimization(params);
-            
-            if (processingRef.current && response.data && response.data.choices && response.data.choices.length > 0) {
-                const optimizedContent = response.data.choices[0].message.content;
-                window._Application.Selection.Text = optimizedContent;
-                message.success('段落优化成功！');
-            }
-        } catch (error: any) {
-            if (error.name === 'AbortError') {
-                // 请求被取消，不显示错误消息
-                return;
-            }
-            message.error(typeof error === 'object' && error !== null && 'message' in error 
-                ? String(error.message) 
-                : '请求失败，请检查网络连接或API配置');
-        } finally {
-            if (processingRef.current) {
-                setLoading(false);
-                setProcessingStatus('');
-                setIsProcessingXML(false);
-                processingRef.current = false;
-            }
-        }
-    }
-    
-    const handleOptimizeAll = async () => {
+    const handleStartProcess = async () => {
         try {
             // 创建新的取消控制器
             cancelTokenRef.current = new AbortController();
@@ -243,14 +182,13 @@ const ArticleOptimizationPage = () => {
             const articleContent = xx;
             
             if (!articleContent || articleContent.trim() === '') {
-                message.warning('文档内容为空，无法进行优化');
+                message.warning('文档内容为空，无法进行处理');
                 setLoading(false);
                 return;
             }
             
             // 检查是否为XML内容
             const isXML = isXMLContent(articleContent);
-            setIsProcessingXML(isXML);
             
             // 如果是XML，提取文本
             const contentToProcess = isXML ? extractTextFromXML(articleContent) : articleContent;
@@ -318,9 +256,9 @@ const ArticleOptimizationPage = () => {
                 window._Application.ActiveDocument.Content = optimizedContent;
                 
                 if (failedChunks > 0) {
-                    message.warning(`文章部分优化成功！有${failedChunks}/${chunks.length}个部分未能成功优化。`);
+                    message.warning(`处理部分成功！有${failedChunks}/${chunks.length}个部分未能成功处理。`);
                 } else {
-                    message.success('文章优化成功！');
+                    message.success('处理成功！');
                 }
             }
         } catch (error: any) {
@@ -337,156 +275,46 @@ const ArticleOptimizationPage = () => {
                 setLoading(false);
                 setProgress(0);
                 setProcessingStatus('');
-                setIsProcessingXML(false);
                 processingRef.current = false;
             }
         }
-    }
+    };
 
     return (
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'start', height: '100vh' }}>
-            <Card title="段落优化" style={{ marginBottom: '20px' }}>
-                <p>选择需要优化的段落，点击按钮即可智能优化文章表达</p>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'white' }}>
+            {loading ? (
+                <div style={{ width: '80%', maxWidth: '500px', textAlign: 'center', color: 'white' }}>
+                    {processingStatus && <p style={{ marginBottom: '20px', color: 'white' }}>{processingStatus}</p>}
+                    <Progress 
+                        type="circle"
+                        percent={progress} 
+                        status="active" 
+                        style={{ marginBottom: '20px' }} 
+                        strokeColor={{
+                            '0%': '#108ee9',
+                            '100%': '#87d068',
+                        }}
+                        trailColor="rgba(255,255,255,0.2)"
+                        format={percent => <span style={{ color: 'white' }}>{percent}%</span>}
+                    />
+                    <Button 
+                        danger
+                        icon={<StopOutlined />}
+                        onClick={handleCancel}
+                        style={{ marginTop: '20px' }}
+                    >
+                        取消操作
+                    </Button>
+                </div>
+            ) : (
                 <Button 
                     type="primary" 
-                    onClick={handleOptimizeSelection}
-                    loading={loading}
-                    style={{ marginRight: '10px' }}
+                    onClick={handleStartProcess}
+                    size="large"
                 >
-                    优化选中段落
+                    开始处理
                 </Button>
-                {loading && (
-                    <Button 
-                        danger
-                        icon={<StopOutlined />}
-                        onClick={handleCancel}
-                    >
-                        取消操作
-                    </Button>
-                )}
-            </Card>
-            <Card title="全文优化">
-                <p>一键优化全文内容，提升文章整体质量</p>
-                {loading && (
-                    <>
-                        {processingStatus && <p style={{ color: '#1890ff' }}>{processingStatus}</p>}
-                        {isProcessingXML && <p style={{ color: '#ff4d4f' }}>检测到XML格式内容，正在提取纯文本...</p>}
-                        {progress > 0 && (
-                            <Progress percent={progress} status="active" style={{ marginBottom: '15px' }} />
-                        )}
-                    </>
-                )}
-                <Button 
-                    onClick={handleOptimizeAll} 
-                    type="primary"
-                    loading={loading}
-                    style={{ marginRight: '10px' }}
-                >
-                    一键优化全文
-                </Button>
-                {loading && (
-                    <Button 
-                        danger
-                        icon={<StopOutlined />}
-                        onClick={handleCancel}
-                        style={{ marginRight: '10px' }}
-                    >
-                        取消操作
-                    </Button>
-                )}
-                <Button 
-                    icon={<SettingOutlined />} 
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    type="text"
-                >
-                    高级选项
-                </Button>
-                
-                {showAdvanced && (
-                    <div style={{ marginTop: '15px', border: '1px solid #f0f0f0', padding: '15px', borderRadius: '4px' }}>
-                        <Row gutter={[16, 16]}>
-                            <Col span={24}>
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <span style={{ marginRight: '8px' }}>分段大小</span>
-                                    <Tooltip title="文本将被分成多个段落进行处理，每段的最大字符数">
-                                        <QuestionCircleOutlined />
-                                    </Tooltip>
-                                </div>
-                                <Row align="middle">
-                                    <Col span={16}>
-                                        <Slider 
-                                            min={1000} 
-                                            max={5000} 
-                                            onChange={setChunkSize} 
-                                            value={chunkSize} 
-                                            step={100}
-                                            disabled={loading}
-                                        />
-                                    </Col>
-                                    <Col span={6} offset={2}>
-                                        <InputNumber
-                                            min={1000}
-                                            max={5000}
-                                            style={{ width: '100%' }}
-                                            value={chunkSize}
-                                            onChange={(value) => value !== null && setChunkSize(value)}
-                                            disabled={loading}
-                                        />
-                                    </Col>
-                                </Row>
-                            </Col>
-                            
-                            <Col span={24}>
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <span style={{ marginRight: '8px' }}>创造性程度</span>
-                                    <Tooltip title="较低值更保守，较高值更有创意（0.1-1.0）">
-                                        <QuestionCircleOutlined />
-                                    </Tooltip>
-                                </div>
-                                <Row align="middle">
-                                    <Col span={16}>
-                                        <Slider 
-                                            min={0.1} 
-                                            max={1.0} 
-                                            onChange={setTemperature} 
-                                            value={temperature} 
-                                            step={0.05}
-                                            disabled={loading}
-                                        />
-                                    </Col>
-                                    <Col span={6} offset={2}>
-                                        <InputNumber
-                                            min={0.1}
-                                            max={1.0}
-                                            style={{ width: '100%' }}
-                                            value={temperature}
-                                            onChange={(value) => value !== null && setTemperature(value)}
-                                            step={0.05}
-                                            disabled={loading}
-                                        />
-                                    </Col>
-                                </Row>
-                            </Col>
-                            
-                            <Col span={24}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                                        <span style={{ marginRight: '8px' }}>保留原文格式</span>
-                                        <Tooltip title="开启后，优化将尽量保持原文的段落和格式">
-                                            <QuestionCircleOutlined />
-                                        </Tooltip>
-                                    </div>
-                                    <Switch 
-                                        checked={preserveFormatting} 
-                                        onChange={setPreserveFormatting}
-                                        disabled={loading}
-                                    />
-                                </div>
-                            </Col>
-                        </Row>
-                    </div>
-                )}
-            </Card>
+            )}
         </div>
     );
 };
