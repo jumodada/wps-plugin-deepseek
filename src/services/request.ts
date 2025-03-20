@@ -32,16 +32,10 @@ apiClient.interceptors.request.use(
 );
 
 apiClient.interceptors.response.use(
-  (response): AxiosResponse<ApiResponse<any>, any> => {
+  (response) => {
     const { setLoading } = useAppStore.getState();
     setLoading(false);
-
-    if (response.data.code === 200) {
-      return response.data;
-    } else {
-      message.error(response.data.msg || '请求失败');
-      throw new Error(response.data.msg);
-    }
+    return response;
   },
   (error) => {
     const { setLoading } = useAppStore.getState();
