@@ -2,7 +2,6 @@ import axios from 'axios';
 import { useQuery, useMutation } from 'react-query';
 import { useAppStore } from './store';
 import { message } from 'antd';
-import { AxiosResponse } from 'axios';
 
 export interface ApiResponse<T> {
   count: number;

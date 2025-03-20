@@ -10,6 +10,7 @@ interface DeepSeekRequest {
   model?: string;
   temperature?: number;
   stream?: boolean;
+  signal?: AbortSignal;
 }
 
 // DeepSeek响应类型
@@ -46,5 +47,7 @@ export const submitOptimization = (params: DeepSeekRequest) => {
     model: params.model || "deepseek-chat",
     temperature: params.temperature || 0.5,
     stream: false // 明确关闭流式传输
+  }, {
+    signal: params.signal // 传递中断信号
   });
 };
