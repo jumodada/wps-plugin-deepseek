@@ -1,55 +1,62 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button, message, Progress, Card, Row, Col, Space, Tooltip } from 'antd';
 import { StopOutlined, SyncOutlined, AimOutlined } from '@ant-design/icons';
 import { submitOptimization } from '../api/deepseek';
+
+// 添加CSS动画样式
+const fadeOutAnimation = {
+    '@keyframes fadeOut': {
+        '0%': { opacity: 1, transform: 'translateY(0)' },
+        '100%': { opacity: 0, transform: 'translateY(-20px)' }
+    },
+    '@keyframes fadeInUp': {
+        '0%': { opacity: 0, transform: 'translateY(20px)' },
+        '100%': { opacity: 1, transform: 'translateY(0)' }
+    }
+};
+
+// 将动画样式插入到文档中
+const injectStyles = () => {
+    const styleEl = document.createElement('style');
+    styleEl.innerHTML = `
+        @keyframes fadeOut {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    `;
+    document.head.appendChild(styleEl);
+};
 
 const extractParagraphsFromDocument = (): { id: string, text: string }[] => {
     try {
         const result: { id: string, text: string }[] = [];
         
-        // 获取文档的OpenXML
-        const docXml = window._Application.ActiveDocument.WordOpenXML;
+        // 使用paragraph.Item()遍历方式获取文档段落
+        const document = window._Application.ActiveDocument;
+        const paragraphCount = document.Paragraphs.Count;
         
-        // 查找w:body标签内容
-        const bodyMatch = /<w:body[^>]*>([\s\S]*?)<\/w:body>/i.exec(docXml);
-        
-        if (!bodyMatch || !bodyMatch[1]) {
-            console.error('无法在XML中找到w:body标签');
-            return [];
-        }
-        
-        const bodyContent = bodyMatch[1];
-        
-        // 使用正则表达式查找所有段落
-        const paragraphRegex = /<w:p\s+(?:[^>]*\s+)?w14:paraId="([^"]+)"[^>]*>([\s\S]*?)<\/w:p>/g;
-        
-        let match: RegExpExecArray | null;
-        while ((match = paragraphRegex.exec(bodyContent)) !== null) {
-            const paraId = match[1];
-            const paragraphContent = match[2];
-            
-            // 提取段落中的文本内容
-            const textContent: string[] = [];
-            const textRegex = /<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/g;
-            let textMatch: RegExpExecArray | null;
-            
-            while ((textMatch = textRegex.exec(paragraphContent)) !== null) {
-                if (textMatch[1]) {
-                    textContent.push(textMatch[1]);
+        for (let i = 1; i <= paragraphCount; i++) {
+            try {
+                const paragraph = document.Paragraphs.Item(i);
+                // 获取段落ID
+                const paraId = paragraph.ParaID;
+                const text = paragraph.Range.Text.trim();
+                
+                // 只添加有文本内容的段落
+                if (text) {
+                    result.push({
+                        id: paraId,
+                        text: text
+                    });
                 }
-            }
-            
-            const paragraphText = textContent.join('').trim();
-            
-            // 只添加有文本内容的段落
-            if (paragraphText) {
-                result.push({
-                    id: paraId,
-                    text: paragraphText
-                });
+            } catch (error) {
+                console.error(`处理第${i}个段落时出错:`, error);
             }
         }
-        
         return result;
     } catch (error) {
         console.error('获取文档段落时出错:', error);
@@ -247,6 +254,14 @@ const ArticleOptimizationPage = () => {
     const [showResults, setShowResults] = useState(false);
     const [replacedItems, setReplacedItems] = useState<Set<string>>(new Set());
     
+    // 创建一个refs对象来存储卡片引用
+    const cardRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+    
+    // 注入CSS动画样式
+    useEffect(() => {
+        injectStyles();
+    }, []);
+    
     const chunkSize = 2000; 
     const preserveFormatting = true; 
     
@@ -442,9 +457,8 @@ const ArticleOptimizationPage = () => {
                         for (let i = 1; i <= paragraphCount; i++) {
                             const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
                             try {
-                                // 查找原始文本对应的段落
-                                const originalItem = originalData.find(orig => orig.id === item.id);
-                                if (originalItem && paragraph.Range.Text.trim() === originalItem.text.trim()) {
+                                // 使用paraID进行比对
+                                if (paragraph.ParaID === item.id) {
                                     paragraph.Range.Text = item.text;
                                     break;
                                 }
@@ -475,88 +489,93 @@ const ArticleOptimizationPage = () => {
 
     const handleReplaceItem = (originalItem: { id: string, text: string }, optimizedItem: { id: string, text: string }) => {
         try {
-            const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
-            let replaced = false;
-            
-            for (let i = 1; i <= paragraphCount; i++) {
-                const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
-                try {
-                    if (paragraph.Range.Text.trim() === originalItem.text.trim()) {
-                        paragraph.Range.Text = optimizedItem.text;
-                        replaced = true;
-                        break;
+            const cardElement = cardRefs.current[originalItem.id];
+            if (cardElement) {
+                // 添加消失动画
+                cardElement.style.animation = 'fadeOut 0.5s ease forwards';
+                
+                // 等待动画完成后再执行替换
+                setTimeout(() => {
+                    const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+                    let replaced = false;
+                    
+                    for (let i = 1; i <= paragraphCount; i++) {
+                        const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
+                        try {
+                            // 使用paraID进行比对
+                            if (paragraph.ParaID === originalItem.id) {
+                                paragraph.Range.Text = optimizedItem.text;
+                                replaced = true;
+                                break;
+                            }
+                        } catch (error) {
+                            continue;
+                        }
                     }
-                } catch (error) {
-                    continue;
-                }
-            }
-            
-            if (replaced) {
-                const newOptimizedData = [...optimizedData];
-                const itemIndex = newOptimizedData.findIndex(item => item.id === optimizedItem.id);
-                if (itemIndex !== -1) {
-                    newOptimizedData[itemIndex] = optimizedItem;
-                    setOptimizedData(newOptimizedData);
-                }
-                
-                setReplacedItems(prev => {
-                    const newSet = new Set(prev);
-                    newSet.add(optimizedItem.id);
-                    return newSet;
-                });
-                
-                message.success(`已替换内容`);
+                    
+                    if (replaced) {
+                        const newOptimizedData = [...optimizedData];
+                        const itemIndex = newOptimizedData.findIndex(item => item.id === optimizedItem.id);
+                        if (itemIndex !== -1) {
+                            newOptimizedData[itemIndex] = optimizedItem;
+                            setOptimizedData(newOptimizedData);
+                        }
+                        
+                        setReplacedItems(prev => {
+                            const newSet = new Set(prev);
+                            newSet.add(optimizedItem.id);
+                            return newSet;
+                        });
+                        
+                        message.success(`已替换内容`);
+                    } else {
+                        message.warning(`未找到原文内容相符的段落`);
+                    }
+                }, 500); // 等待动画完成
             } else {
-                message.warning(`未找到原文内容相符的段落`);
+                // 如果没有找到卡片元素，直接执行替换逻辑
+                const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+                let replaced = false;
+                
+                for (let i = 1; i <= paragraphCount; i++) {
+                    const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
+                    try {
+                        // 使用paraID进行比对
+                        if (paragraph.ParaID === originalItem.id) {
+                            paragraph.Range.Text = optimizedItem.text;
+                            replaced = true;
+                            break;
+                        }
+                    } catch (error) {
+                        continue;
+                    }
+                }
+                
+                if (replaced) {
+                    const newOptimizedData = [...optimizedData];
+                    const itemIndex = newOptimizedData.findIndex(item => item.id === optimizedItem.id);
+                    if (itemIndex !== -1) {
+                        newOptimizedData[itemIndex] = optimizedItem;
+                        setOptimizedData(newOptimizedData);
+                    }
+                    
+                    setReplacedItems(prev => {
+                        const newSet = new Set(prev);
+                        newSet.add(optimizedItem.id);
+                        return newSet;
+                    });
+                    
+                    message.success(`已替换内容`);
+                } else {
+                    message.warning(`未找到原文内容相符的段落`);
+                }
             }
         } catch (error: any) {
             message.error('替换失败: ' + (error.message || String(error)));
         }
     };
 
-    const handleUndoReplace = (originalItem: { id: string, text: string }) => {
-        try {
-            const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
-            let replaced = false;
-            
-            // 在已优化数据中找到对应原始段落的优化内容
-            const optimizedItem = optimizedData.find(item => item.id === originalItem.id);
-            
-            if (!optimizedItem) {
-                message.warning('找不到对应的优化内容');
-                return;
-            }
-            
-            for (let i = 1; i <= paragraphCount; i++) {
-                const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
-                try {
-                    if (paragraph.Range.Text.trim() === optimizedItem.text.trim()) {
-                        paragraph.Range.Text = originalItem.text;
-                        replaced = true;
-                        break;
-                    }
-                } catch (error) {
-                    continue;
-                }
-            }
-            
-            if (replaced) {
-                setReplacedItems(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(originalItem.id);
-                    return newSet;
-                });
-                
-                message.success(`已撤回内容替换`);
-            } else {
-                message.warning(`未找到优化内容相符的段落`);
-            }
-        } catch (error: any) {
-            message.error('撤回失败: ' + (error.message || String(error)));
-        }
-    };
-
-    const handleLocateInDocument = (paragraphId: string, paragraphText: string) => {
+    const handleLocateInDocument = (paragraphId: string) => {
         try {
             const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
             let found = false;
@@ -564,10 +583,19 @@ const ArticleOptimizationPage = () => {
             for (let i = 1; i <= paragraphCount; i++) {
                 const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
                 try {
-                    // 使用text内容进行比对
-                    if (paragraph.Range.Text.trim() === paragraphText.trim()) {
+                    // 使用paraID进行比对
+                    if (paragraph.ParaID === paragraphId) {
                         paragraph.Range.Select();
                         found = true;
+                        
+                        // 滚动到对应的卡片位置
+                        if (cardRefs.current[paragraphId]) {
+                            cardRefs.current[paragraphId]?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'start'
+                            });
+                        }
+                        
                         break;
                     }
                 } catch (error) {
@@ -587,47 +615,6 @@ const ArticleOptimizationPage = () => {
         handleReplace();
     };
 
-    const handleUndoAll = () => {
-        try {
-            if (originalData.length > 0) {
-                for (const item of originalData) {
-                    try {
-                        // 在已优化数据中找到对应原始段落的优化内容
-                        const optimizedItem = optimizedData.find(opt => opt.id === item.id);
-                        
-                        if (!optimizedItem) {
-                            continue;
-                        }
-                        
-                        const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
-                        for (let i = 1; i <= paragraphCount; i++) {
-                            const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
-                            try {
-                                if (paragraph.Range.Text.trim() === optimizedItem.text.trim()) {
-                                    paragraph.Range.Text = item.text;
-                                    break;
-                                }
-                            } catch (error) {
-                                continue;
-                            }
-                        }
-                    } catch (paraError) {
-                        console.error(`撤回段落 ${item.id} 时出错:`, paraError);
-                    }
-                }
-                
-                // 清空已替换状态
-                setReplacedItems(new Set<string>());
-                
-                message.success('已撤回所有替换内容！');
-            } else {
-                message.warning('没有可撤回的内容');
-            }
-        } catch (error: any) {
-            message.error('撤回失败: ' + (error.message || String(error)));
-        }
-    };
-
     const renderActionButtons = () => {
         const allReplaced = optimizedData.length > 0 && 
                            optimizedData.every(item => replacedItems.has(item.id));
@@ -635,16 +622,7 @@ const ArticleOptimizationPage = () => {
         return (
             <div style={{ textAlign: 'center', marginTop: '30px' }}>
                 <Space>
-                    {allReplaced ? (
-                        <Button 
-                            type="primary" 
-                            danger
-                            size="large" 
-                            onClick={handleUndoAll}
-                        >
-                            全部撤回
-                        </Button>
-                    ) : (
+                    {!allReplaced && (
                         <Button 
                             type="primary" 
                             size="large" 
@@ -670,10 +648,13 @@ const ArticleOptimizationPage = () => {
         // 定义卡片宽度
         const cardWidth = 400;
         
-        // 过滤数据，只保留有优化内容且优化内容与原始内容不同的项
+        // 过滤数据，只保留有优化内容且优化内容与原始内容不同的项，同时排除已替换的项
         const filteredData = originalData.filter(item => {
             const optimizedItem = optimizedData.find(opt => opt.id === item.id);
-            return optimizedItem && optimizedItem.text.trim() !== item.text.trim();
+            // 排除已替换的段落
+            return optimizedItem && 
+                   optimizedItem.text.trim() !== item.text.trim() && 
+                   !replacedItems.has(item.id);
         });
         
         if (filteredData.length === 0) {
@@ -682,7 +663,7 @@ const ArticleOptimizationPage = () => {
                     <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '20px' }}>优化结果对比</h2>
                     <Card style={{ maxWidth: '500px', margin: '0 auto' }}>
                         <div style={{ padding: '20px', textAlign: 'center' }}>
-                            <p>没有需要优化的内容或优化内容与原内容相同</p>
+                            <p>{replacedItems.size > 0 ? '所有内容已成功替换' : '没有需要优化的内容或优化内容与原内容相同'}</p>
                             <Button 
                                 size="large" 
                                 onClick={() => setShowResults(false)}
@@ -702,7 +683,6 @@ const ArticleOptimizationPage = () => {
                 <Row gutter={[16, 16]} justify="center">
                     {filteredData.map((item, index) => {
                         const optimizedItem = optimizedData.find(opt => opt.id === item.id);
-                        const isReplaced = replacedItems.has(item.id);
                         
                         return (
                             <Col xs={24} sm={12} md={8} key={item.id} style={{ 
@@ -711,14 +691,15 @@ const ArticleOptimizationPage = () => {
                                 justifyContent: 'center'
                             }}>
                                 <Card 
+                                    ref={el => cardRefs.current[item.id] = el}
                                     bordered={true}
                                     style={{ 
                                         width: cardWidth,
                                         cursor: 'pointer',
                                         transition: 'all 0.3s',
                                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                                        borderColor: isReplaced ? '#52c41a' : 'transparent',
-                                        borderWidth: isReplaced ? '2px' : '1px'
+                                        borderWidth: '1px',
+                                        animation: 'fadeInUp 0.5s ease'
                                     }}
                                     bodyStyle={{
                                         padding: '12px',
@@ -726,7 +707,7 @@ const ArticleOptimizationPage = () => {
                                         flexDirection: 'column'
                                     }}
                                     hoverable
-                                    onClick={() => handleLocateInDocument(item.id, item.text)}
+                                    onClick={() => handleLocateInDocument(item.id)}
                                 >
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                                         <div style={{ 
@@ -779,30 +760,16 @@ const ArticleOptimizationPage = () => {
                                                 </Tooltip>
                                                 
                                                 <div style={{ textAlign: 'center', marginTop: 'auto' }}>
-                                                    {isReplaced ? (
-                                                        <Button 
-                                                            type="text" 
-                                                            danger
-                                                            icon={<SyncOutlined />}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleUndoReplace(item);
-                                                            }}
-                                                        >
-                                                            撤回
-                                                        </Button>
-                                                    ) : (
-                                                        <Button 
-                                                            type="text" 
-                                                            icon={<SyncOutlined />}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleReplaceItem(item, optimizedItem);
-                                                            }}
-                                                        >
-                                                            替换此段
-                                                        </Button>
-                                                    )}
+                                                    <Button 
+                                                        type="text" 
+                                                        icon={<SyncOutlined />}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleReplaceItem(item, optimizedItem);
+                                                        }}
+                                                    >
+                                                        替换此段
+                                                    </Button>
                                                 </div>
                                             </>
                                         )}
