@@ -36,15 +36,25 @@ export const xmlNavbarButtons: XMLNavbarButtons = {
         label: '段落优化',
         image: 'images/1.svg',
         onAction: () => {
-            console.log(window._Application)
-            const tsId = window._Application.PluginStorage.getItem('task_pane_id');
-            if (!tsId) {
-                const taskPane = window._Application.CreateTaskPane(GetUrlPath() + '/article-optimization');
-                window._Application.PluginStorage.setItem('task_pane_id', taskPane.ID);
-                taskPane.Visible = true;
-            } else {
-                const taskPane = window._Application.GetTaskPane(tsId);
-                taskPane.Visible = !taskPane.Visible;
+            try {
+                const selection = window._Application.Selection;
+                if (!selection || selection.Text.trim() === '') {
+                    alert('请先选择需要优化的段落');
+                    return;
+                }
+                
+                // 有选中文本，打开段落优化面板
+                const tsId = window._Application.PluginStorage.getItem('selection_pane_id');
+                if (!tsId) {
+                    const taskPane = window._Application.CreateTaskPane(GetUrlPath() + '/selection-optimization');
+                    window._Application.PluginStorage.setItem('selection_pane_id', taskPane.ID);
+                    taskPane.Visible = true;
+                } else {
+                    const taskPane = window._Application.GetTaskPane(tsId);
+                    taskPane.Visible = !taskPane.Visible;
+                }
+            } catch (error) {
+                alert('无法获取选中内容，请重试');
             }
         }
     },
