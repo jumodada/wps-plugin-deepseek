@@ -5,7 +5,6 @@ import {
     isWordDocument,
     extractSelectedText,
     retryOptimization,
-    replaceParagraphInDocument,
     locateParagraphInDocument,
     injectOptimizationStyles
 } from '../tool/optimization';
@@ -17,21 +16,16 @@ const SelectionOptimizationPage = () => {
     const [originalItem, setOriginalItem] = useState<{ id: string, text: string } | null>(null);
     const [optimizedItem, setOptimizedItem] = useState<{ id: string, text: string } | null>(null);
     const [showResults, setShowResults] = useState(false);
-    const [isReplaced, setIsReplaced] = useState(false);
     
-    // 创建一个refs对象来存储卡片引用
     const cardRef = useRef<HTMLDivElement | null>(null);
     
-    // 注入CSS动画样式
     useEffect(() => {
         injectOptimizationStyles();
     }, []);
     
-    // 取消请求的控制器
     const cancelTokenRef = useRef<AbortController | null>(null);
     const processingRef = useRef<boolean>(false);
     
-    // 取消处理
     const handleCancel = () => {
         if (cancelTokenRef.current) {
             cancelTokenRef.current.abort();
@@ -74,7 +68,6 @@ const SelectionOptimizationPage = () => {
             try {
                 setProcessingStatus('正在优化内容...');
                 
-                // 构建API请求参数
                 const params = {
                     messages: [
                         {
@@ -100,7 +93,6 @@ const SelectionOptimizationPage = () => {
                 if (processingRef.current && response.data && response.data.choices && response.data.choices.length > 0) {
                     const result = response.data.choices[0].message.content;
                     
-                    // 设置优化后的内容
                     setOptimizedItem({
                         id: selectedText.id,
                         text: result.trim()
@@ -138,15 +130,11 @@ const SelectionOptimizationPage = () => {
     const handleReplace = () => {
         try {
             if (optimizedItem && originalItem) {
-                // 直接使用Selection.Text替换文本
                 window.Application.Selection.Text = optimizedItem.text;
-                setIsReplaced(true);
                 
-                // 添加卡片消失动画
                 if (cardRef.current) {
                     cardRef.current.style.animation = 'fadeOut 0.5s ease forwards';
                     
-                    // 动画结束后隐藏结果
                     setTimeout(() => {
                         setShowResults(false);
                     }, 500);
@@ -170,7 +158,6 @@ const SelectionOptimizationPage = () => {
     const renderComparisonCard = () => {
         if (!showResults || !originalItem || !optimizedItem) return null;
         
-        // 检查优化前后内容是否相同
         if (originalItem.text.trim() === optimizedItem.text.trim()) {
             return (
                 <div style={{ marginTop: '20px', width: '100%', textAlign: 'center' }}>
