@@ -481,16 +481,18 @@ const ArticleOptimizationPage = () => {
                         if (paragraph.ParaID === originalItem.id) {
                             // 保存原始样式
                             const originalStyle = paragraph.Style;
-
+                            const CharacterUnitFirstLineIndent = paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent;
+                            const CharacterUnitLeftIndent = paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent;
+                            const firstLineIndent = paragraph.Range.ParagraphFormat.FirstLineIndent;
                             let newText = optimizedItem.text;
                             if (!newText.endsWith('\r')) {
                                 newText = newText + '\r';
                             }
                             paragraph.Range.Text = newText;
-
-                            // 恢复原始样式
                             paragraph.Style = originalStyle;
-
+                            paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
+                            paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
+                            paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
                             replaced = true;
                             break;
                         }
@@ -590,6 +592,7 @@ const ArticleOptimizationPage = () => {
         );
     };
 
+    // 创建一个函数来高亮显示文本中的变化
     const highlightTextChanges = (originalText: string, optimizedText: string) => {
         const cleanOriginalText = originalText.replace(/\r/g, '');
         const cleanOptimizedText = optimizedText.replace(/\r/g, '');
