@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button, message, Progress, Card, Row, Col, Space, Tooltip } from 'antd';
-import { StopOutlined, SyncOutlined, AimOutlined } from '@ant-design/icons';
+import { StopOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { submitOptimization } from '../api/deepseek';
+import { usePageReset } from '../hooks';
 
 // 添加CSS动画样式
 const fadeOutAnimation = {
@@ -66,11 +67,6 @@ const extractParagraphsFromDocument = (): { id: string, text: string }[] => {
 };
 
 
-const structuredDataToText = (data: { id: string, text: string }[]): string => {
-    return data.map(item => item.text).join('\n\n');
-};
-
-
 const isWordDocument = (): boolean => {
     try {
         return !!window._Application.ActiveDocument;
@@ -78,96 +74,6 @@ const isWordDocument = (): boolean => {
         return false;
     }
 };
-
-
-const splitPlainTextIntoChunks = (text: string, chunkSize: number = 3000): string[] => {
-    if (!text || text.length <= chunkSize) {
-        return [text];
-    }
-
-    const chunks: string[] = [];
-
-
-    const paragraphs = text.split(/\n\s*\n/);
-
-
-    if (paragraphs.length <= 1 && text.length > chunkSize) {
-        return splitBySentences(text, chunkSize);
-    }
-
-    let currentChunk = '';
-
-    for (const paragraph of paragraphs) {
-
-        if (paragraph.length > chunkSize) {
-
-            if (currentChunk) {
-                chunks.push(currentChunk);
-                currentChunk = '';
-            }
-
-
-            const subChunks = splitBySentences(paragraph, chunkSize);
-            chunks.push(...subChunks);
-            continue;
-        }
-
-
-        if (currentChunk.length + paragraph.length > chunkSize && currentChunk.length > 0) {
-            chunks.push(currentChunk);
-            currentChunk = paragraph;
-        } else {
-            currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
-        }
-    }
-
-    if (currentChunk) {
-        chunks.push(currentChunk);
-    }
-
-    return chunks;
-};
-
-
-const splitBySentences = (text: string, chunkSize: number): string[] => {
-    const chunks: string[] = [];
-
-
-
-    const sentences = text.split(/(?<=[.!?。！？\n])\s*/);
-
-    let currentChunk = '';
-
-    for (const sentence of sentences) {
-
-        if (sentence.length > chunkSize) {
-            if (currentChunk) {
-                chunks.push(currentChunk);
-                currentChunk = '';
-            }
-
-
-            for (let i = 0; i < sentence.length; i += chunkSize) {
-                chunks.push(sentence.substring(i, i + chunkSize));
-            }
-            continue;
-        }
-
-        if (currentChunk.length + sentence.length > chunkSize && currentChunk) {
-            chunks.push(currentChunk);
-            currentChunk = sentence;
-        } else {
-            currentChunk += (currentChunk && !currentChunk.endsWith('\n') ? ' ' : '') + sentence;
-        }
-    }
-
-    if (currentChunk) {
-        chunks.push(currentChunk);
-    }
-
-    return chunks;
-};
-
 
 const retryOptimization = async (params: any, maxRetries: number = 3): Promise<any> => {
     let lastError;
@@ -192,84 +98,138 @@ const retryOptimization = async (params: any, maxRetries: number = 3): Promise<a
 };
 
 
-const updateXMLWithStructuredData = (originalXML: string, structuredData: { id: string, text: string }[]): string => {
-    try {
-        let updatedXML = originalXML;
-
-
-        const paragraphMap = new Map<string, string>();
-        structuredData.forEach(item => {
-            paragraphMap.set(item.id, item.text);
-        });
-
-
-        paragraphMap.forEach((newText, paraId) => {
-
-            const paragraphRegex = new RegExp(`(<w:p\\s+(?:[^>]*\\s+)?w14:paraId="${paraId}"[^>]*>)([\\s\\S]*?)(<\\/w:p>)`, 'g');
-
-            updatedXML = updatedXML.replace(paragraphRegex, (match, startTag, content, endTag) => {
-
-                const textTags = content.match(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/g) || [];
-
-                if (textTags.length === 0) {
-
-                    return match;
-                }
-
-
-                if (textTags.length === 1) {
-                    const updatedContent = content.replace(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/g,
-                        (textMatch, textContent) => textMatch.replace(textContent, newText));
-                    return startTag + updatedContent + endTag;
-                }
-
-
-
-                let isFirstTag = true;
-                const updatedContent = content.replace(/<w:t(?:\s+[^>]*)?>([\s\S]*?)<\/w:t>/g,
-                    (textMatch, textContent) => {
-                        if (isFirstTag) {
-                            isFirstTag = false;
-                            return textMatch.replace(textContent, newText);
-                        }
-                        return textMatch.replace(textContent, '');
-                    });
-
-                return startTag + updatedContent + endTag;
-            });
-        });
-
-        return updatedXML;
-    } catch (error) {
-        console.error('更新XML文档时出错:', error);
-        return originalXML;
-    }
-};
-
 const ArticleOptimizationPage = () => {
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [processingStatus, setProcessingStatus] = useState('');
     const [originalData, setOriginalData] = useState<{ id: string, text: string }[]>([]);
-    const [optimizedData, setOptimizedData] = useState<{ id: string, text: string, notImprove?: boolean }[]>([]);
+    const [optimizedData, setOptimizedData] = useState<{ 
+        id: string, 
+        text: string, 
+        notImprove?: boolean 
+    }[]>([]);
     const [showResults, setShowResults] = useState(false);
     const [replacedItems, setReplacedItems] = useState<Set<string>>(new Set());
+    const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
-    // 创建一个refs对象来存储卡片引用
+    // 使用文档切换监听钩子，当文档切换时重置页面状态
+    const handleReset = () => {
+        // 自定义重置逻辑
+        setLoading(false);
+        setProgress(0);
+        setProcessingStatus('');
+        setOriginalData([]);
+        setOptimizedData([]);
+        setShowResults(false);
+        setReplacedItems(new Set());
+        setActiveCardId(null);
+        
+        // 先恢复所有样式，避免样式残留
+        restoreAllOriginalStyles();
+        
+        message.info('文档已切换，页面已重置');
+    };
+    
+    // 应用页面重置钩子
+    usePageReset(handleReset);
+    
     const cardRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+    const previousActiveCardId = useRef<string | null>(null);
+    // 创建独立的Map来存储原始样式
+    const originalStylesMap = useRef<Map<string, { underline: number, color: number }>>(new Map());
 
     // 注入CSS动画样式
     useEffect(() => {
         injectStyles();
     }, []);
 
-    const chunkSize = 2000;
+    // 在卸载组件或取消激活状态时恢复原始样式
+    useEffect(() => {
+        return () => {
+            // 组件卸载时恢复样式
+            restoreAllOriginalStyles();
+        };
+    }, []);
+
     const preserveFormatting = true;
 
 
     const cancelTokenRef = useRef<AbortController | null>(null);
     const processingRef = useRef<boolean>(false);
 
+    // 恢复指定段落原始文本样式的函数
+    const restoreOriginalStyle = (paragraphId: string) => {
+        const originalStyle = originalStylesMap.current.get(paragraphId);
+        if (originalStyle) {
+            try {
+                const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+                for (let i = 1; i <= paragraphCount; i++) {
+                    try {
+                        const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
+                        if (paragraph.ParaID === paragraphId) {
+                            // 检查并替换9999999值为0
+                            const underline = originalStyle.underline === 9999999 ? 0 : originalStyle.underline;
+                            const color = originalStyle.color === 9999999 ? 0 : originalStyle.color;
+                            
+                            paragraph.Range.Font.Underline = underline;
+                            paragraph.Range.Font.Color = color;
+                            break;
+                        }
+                    } catch (error) {
+                        continue;
+                    }
+                }
+            } catch (error) {
+                console.error('恢复原始样式时出错:', error);
+            }
+        }
+    };
+
+    // 恢复所有段落的原始样式
+    const restoreAllOriginalStyles = () => {
+        // 使用Map的keys()和forEach迭代所有存储的样式
+        originalStylesMap.current.forEach((_, paragraphId) => {
+            restoreOriginalStyle(paragraphId);
+        });
+    };
+
+    // 应用高亮样式到所有段落
+    const applyHighlightToAllParagraphs = () => {
+        try {
+            const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+
+            for (const item of optimizedData) {
+                // 跳过不需要优化的项
+                if (item.notImprove) continue;
+
+                for (let j = 1; j <= paragraphCount; j++) {
+                    try {
+                        const paragraph = window._Application.ActiveDocument.Paragraphs.Item(j);
+                        if (paragraph.ParaID === item.id) {
+                            // 保存原始样式，处理9999999的情况
+                            const underline = paragraph.Range.Font.Underline;
+                            const color = paragraph.Range.Font.Color;
+                            
+                            // 保存到独立的Map中
+                            originalStylesMap.current.set(item.id, {
+                                underline: underline === 9999999 ? 0 : underline,
+                                color: color === 9999999 ? 0 : color
+                            });
+                            
+                            // 应用高亮样式
+                            paragraph.Range.Font.Underline = 11; // 设置下划线
+                            paragraph.Range.Font.Color = 255;   // 设置颜色为红色
+                            break;
+                        }
+                    } catch (error) {
+                        continue;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('应用高亮样式时出错:', error);
+        }
+    };
 
     const handleCancel = () => {
         if (cancelTokenRef.current) {
@@ -277,7 +237,6 @@ const ArticleOptimizationPage = () => {
             cancelTokenRef.current = null;
         }
         processingRef.current = false;
-        message.info('操作已取消');
         setLoading(false);
         setProcessingStatus('');
         setProgress(0);
@@ -423,6 +382,10 @@ const ArticleOptimizationPage = () => {
     };
 
     const handleReplace = () => {
+        // 替换前恢复原始样式
+        restoreAllOriginalStyles();
+        setActiveCardId(null);
+        
         try {
             if (optimizedData.length > 0) {
                 for (const item of optimizedData) {
@@ -456,6 +419,9 @@ const ArticleOptimizationPage = () => {
                     newReplacedItems.add(item.id);
                 });
                 setReplacedItems(newReplacedItems);
+                
+                // 清空样式存储Map
+                originalStylesMap.current.clear();
 
                 message.success('全部内容已替换完成！');
             } else {
@@ -467,6 +433,14 @@ const ArticleOptimizationPage = () => {
     };
 
     const handleReplaceItem = (originalItem: { id: string, text: string }, optimizedItem: { id: string, text: string }) => {
+        // 替换前恢复原始样式
+        if (activeCardId) {
+            restoreOriginalStyle(activeCardId);
+            // 替换后从样式Map中移除
+            originalStylesMap.current.delete(activeCardId);
+        }
+        setActiveCardId(null);
+        
         try {
             const cardElement = cardRefs.current[originalItem.id];
             if (cardElement) {
@@ -514,6 +488,9 @@ const ArticleOptimizationPage = () => {
                         newSet.add(optimizedItem.id);
                         return newSet;
                     });
+                    
+                    // 从样式Map中移除已替换的项
+                    originalStylesMap.current.delete(originalItem.id);
 
                     message.success(`已替换内容`);
                 } else {
@@ -527,6 +504,20 @@ const ArticleOptimizationPage = () => {
 
     const handleLocateInDocument = (paragraphId: string) => {
         try {
+            // 如果已有激活的卡片，先恢复其样式并清除激活状态
+            if (activeCardId && activeCardId !== paragraphId) {
+                // 恢复当前激活卡片的样式
+                restoreOriginalStyle(activeCardId);
+                setActiveCardId(null);
+            }
+            
+            // 如果点击的是当前激活的卡片，则恢复其样式并取消激活状态
+            if (activeCardId === paragraphId) {
+                restoreOriginalStyle(paragraphId);
+                setActiveCardId(null);
+                return;
+            }
+            
             const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
             let found = false;
 
@@ -537,6 +528,24 @@ const ArticleOptimizationPage = () => {
                     if (paragraph.ParaID === paragraphId) {
                         paragraph.Range.Select();
                         found = true;
+
+                        // 保存原始样式
+                        const selection = window._Application.Selection;
+                        const underlineStyle = selection.Font.Underline === 9999999 ? 0 : selection.Font.Underline;
+                        const colorStyle = selection.Font.Color === 9999999 ? 0 : selection.Font.Color;
+                        
+                        // 保存到独立的Map中
+                        originalStylesMap.current.set(paragraphId, {
+                            underline: underlineStyle,
+                            color: colorStyle
+                        });
+                        
+                        // 设置新样式
+                        selection.Font.Underline = 11; // 设置下划线
+                        selection.Font.Color = 255;   // 设置颜色为红色
+                        
+                        // 设置当前激活的卡片ID
+                        setActiveCardId(paragraphId);
 
                         // 滚动到对应的卡片位置
                         if (cardRefs.current[paragraphId]) {
@@ -562,6 +571,13 @@ const ArticleOptimizationPage = () => {
     };
 
     const handleReplaceAll = () => {
+        // 替换全部前恢复活动卡片样式
+        if (activeCardId) {
+            restoreOriginalStyle(activeCardId);
+        }
+        setActiveCardId(null);
+        // 清空样式Map
+        originalStylesMap.current.clear();
         handleReplace();
     };
 
@@ -571,22 +587,37 @@ const ArticleOptimizationPage = () => {
 
         return (
             <div style={{ textAlign: 'center', marginTop: '30px' }}>
-                <Space>
+                <Space size="large">
                     {!allReplaced && (
-                        <Button
-                            type="primary"
-                            size="large"
+                        <span
+                            style={{ 
+                                cursor: 'pointer', 
+                                color: '#1890ff',
+                                fontSize: '15px'
+                            }}
                             onClick={handleReplaceAll}
                         >
+                            <CheckOutlined style={{ marginRight: '5px' }} />
                             全部替换
-                        </Button>
+                        </span>
                     )}
-                    <Button
-                        size="large"
-                        onClick={() => setShowResults(false)}
+                    <span
+                        style={{ 
+                            cursor: 'pointer', 
+                            color: '#999',
+                            fontSize: '15px'
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            // 取消显示结果前恢复原始样式
+                            restoreAllOriginalStyles();
+                            setActiveCardId(null);
+                            setShowResults(false);
+                        }}
                     >
-                        取消
-                    </Button>
+                        <CloseOutlined style={{ marginRight: '5px' }} />
+                        返回
+                    </span>
                 </Space>
             </div>
         );
@@ -691,13 +722,25 @@ const ArticleOptimizationPage = () => {
                     <Card style={{ maxWidth: '500px', margin: '0 auto' }}>
                         <div style={{ padding: '20px', textAlign: 'center' }}>
                             <p>{replacedItems.size > 0 ? '所有内容已成功替换' : '没有需要优化的内容或优化内容与原内容相同'}</p>
-                            <Button
-                                size="large"
-                                onClick={() => setShowResults(false)}
-                                style={{ marginTop: '15px' }}
+                            <span
+                                style={{ 
+                                    cursor: 'pointer', 
+                                    color: '#999',
+                                    fontSize: '15px',
+                                    marginTop: '15px',
+                                    display: 'inline-block'
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    // 取消显示结果前恢复原始样式
+                                    restoreAllOriginalStyles();
+                                    setActiveCardId(null);
+                                    setShowResults(false);
+                                }}
                             >
+                                <CloseOutlined style={{ marginRight: '5px' }} />
                                 返回
-                            </Button>
+                            </span>
                         </div>
                     </Card>
                 </div>
@@ -713,6 +756,9 @@ const ArticleOptimizationPage = () => {
 
                         // 生成高亮文本
                         const highlightedText = highlightTextChanges(item.text, optimizedItem.text);
+                        
+                        // 检查当前卡片是否处于激活状态
+                        const isActive = activeCardId === item.id;
 
                         return (
                             <Col xs={24} sm={12} md={8} key={item.id} style={{
@@ -727,56 +773,76 @@ const ArticleOptimizationPage = () => {
                                         width: cardWidth,
                                         cursor: 'pointer',
                                         transition: 'all 0.3s',
-                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                                        borderWidth: '1px',
+                                        boxShadow: isActive ? '0 0 10px rgba(24, 144, 255, 0.8)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
+                                        borderWidth: isActive ? '2px' : '1px',
+                                        borderColor: isActive ? '#1890ff' : '',
                                         animation: 'fadeInUp 0.5s ease'
                                     }}
                                     bodyStyle={{
                                         padding: '12px',
                                         display: 'flex',
-                                        flexDirection: 'column'
+                                        flexDirection: 'column',
+                                        background: isActive ? '#f0f8ff' : ''
                                     }}
                                     hoverable
                                     onClick={() => handleLocateInDocument(item.id)}
                                 >
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                        <div style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            marginBottom: '8px'
-                                        }}>
-                                            <Tooltip title="定位到文档">
-                                                <AimOutlined style={{ color: '#52c41a' }} />
-                                            </Tooltip>
-                                        </div>
-
                                         <Tooltip title={optimizedItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
                                             <div
                                                 style={{
                                                     maxHeight: '200px',
                                                     overflow: 'auto',
-                                                    color: '#1890ff',
+                                                    color: replacedItems.has(item.id) ? '#999' : '#bbc6ce',
                                                     padding: '8px',
                                                     background: '#f0f8ff',
                                                     borderRadius: '4px',
-                                                    marginBottom: '16px'
+                                                    marginBottom: '16px',
+                                                    textDecoration: replacedItems.has(item.id) ? 'line-through' : 'none'
                                                 }}
                                                 dangerouslySetInnerHTML={{ __html: highlightedText }}
                                             />
                                         </Tooltip>
 
-                                        <div style={{ textAlign: 'center', marginTop: 'auto' }}>
-                                            <Button
-                                                type="text"
-                                                icon={<SyncOutlined />}
+                                        <div style={{ textAlign: 'center', marginTop: 'auto', display: 'flex', justifyContent: 'center', gap: '15px' }}>
+                                            <span
+                                                style={{ 
+                                                    cursor: 'pointer', 
+                                                    color: '#1890ff',
+                                                    fontSize: '13px'
+                                                }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     handleReplaceItem(item, optimizedItem);
                                                 }}
                                             >
-                                                替换此段
-                                            </Button>
+                                                <CheckOutlined style={{ marginRight: '3px' }} />
+                                                替换
+                                            </span>
+                                            <span
+                                                style={{ 
+                                                    cursor: 'pointer', 
+                                                    color: '#999',
+                                                    fontSize: '13px'
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (activeCardId === item.id) {
+                                                        restoreOriginalStyle(item.id);
+                                                        setActiveCardId(null);
+                                                        // 从样式Map中移除
+                                                        originalStylesMap.current.delete(item.id);
+                                                    }
+                                                    setReplacedItems(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.add(item.id);
+                                                        return newSet;
+                                                    });
+                                                }}
+                                            >
+                                                <CloseOutlined style={{ marginRight: '3px' }} />
+                                                忽略
+                                            </span>
                                         </div>
                                     </div>
                                 </Card>
@@ -789,6 +855,14 @@ const ArticleOptimizationPage = () => {
             </div>
         );
     };
+
+    // 监听activeCardId变化，当变为null时恢复样式
+    useEffect(() => {
+        if (activeCardId === null && previousActiveCardId.current) {
+            restoreOriginalStyle(previousActiveCardId.current);
+        }
+        previousActiveCardId.current = activeCardId;
+    }, [activeCardId]);
 
     return (
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'white' }}>

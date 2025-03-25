@@ -8,6 +8,7 @@ import {
     locateParagraphInDocument,
     injectOptimizationStyles
 } from '../tool/optimization';
+import { usePageReset } from '../hooks';
 
 const SelectionOptimizationPage = () => {
     const [loading, setLoading] = useState(false);
@@ -16,15 +17,60 @@ const SelectionOptimizationPage = () => {
     const [originalItem, setOriginalItem] = useState<{ id: string, text: string } | null>(null);
     const [optimizedItem, setOptimizedItem] = useState<{ id: string, text: string } | null>(null);
     const [showResults, setShowResults] = useState(false);
+    const [isActive, setIsActive] = useState(false);
+    
+    // 使用文档切换监听钩子，当文档切换时重置页面状态
+    const handleReset = () => {
+        // 自定义重置逻辑
+        setLoading(false);
+        setProgress(0);
+        setProcessingStatus('');
+        setOriginalItem(null);
+        setOptimizedItem(null);
+        setShowResults(false);
+        setIsActive(false);
+        
+        // 恢复样式
+        restoreOriginalStyle();
+        
+        message.info('文档已切换，页面已重置');
+    };
+    
+    // 应用页面重置钩子
+    usePageReset(handleReset);
     
     const cardRef = useRef<HTMLDivElement | null>(null);
+    const originalFontStyles = useRef<{ underline: number, color: number } | null>(null);
     
     useEffect(() => {
         injectOptimizationStyles();
     }, []);
     
+    // 在卸载组件或取消激活状态时恢复原始样式
+    useEffect(() => {
+        return () => {
+            // 组件卸载时恢复样式
+            restoreOriginalStyle();
+        };
+    }, []);
+    
     const cancelTokenRef = useRef<AbortController | null>(null);
     const processingRef = useRef<boolean>(false);
+    
+    // 恢复原始文本样式的函数
+    const restoreOriginalStyle = () => {
+        if (originalFontStyles.current && isActive) {
+            try {
+                const selection = window._Application.Selection;
+                if (selection) {
+                    selection.Font.Underline = originalFontStyles.current.underline;
+                    selection.Font.Color = originalFontStyles.current.color;
+                }
+            } catch (error) {
+                console.error('恢复原始样式时出错:', error);
+            }
+        }
+    };
     
     const handleCancel = () => {
         if (cancelTokenRef.current) {
@@ -128,9 +174,13 @@ const SelectionOptimizationPage = () => {
     };
     
     const handleReplace = () => {
+        // 替换前恢复原始样式
+        restoreOriginalStyle();
+        setIsActive(false);
+        
         try {
             if (optimizedItem && originalItem) {
-                window.Application.Selection.Text = optimizedItem.text;
+                window._Application.Selection.Text = optimizedItem.text;
                 
                 if (cardRef.current) {
                     cardRef.current.style.animation = 'fadeOut 0.5s ease forwards';
@@ -151,7 +201,34 @@ const SelectionOptimizationPage = () => {
     
     const handleLocateInDocument = () => {
         if (originalItem) {
-            locateParagraphInDocument(originalItem.id);
+            try {
+                // 如果当前卡片处于激活状态，则取消激活并恢复样式
+                if (isActive) {
+                    restoreOriginalStyle();
+                    setIsActive(false);
+                    return;
+                }
+                
+                // 定位到文档中的段落
+                const found = locateParagraphInDocument(originalItem.id);
+                
+                if (found) {
+                    // 保存原始样式
+                    const selection = window._Application.Selection;
+                    originalFontStyles.current = {
+                        underline: selection.Font.Underline,
+                        color: selection.Font.Color
+                    };
+                    
+                    // 设置新样式
+                    selection.Font.Underline = 11; // 设置下划线
+                    selection.Font.Color = 255;   // 设置颜色为红色
+                    
+                    setIsActive(true);
+                }
+            } catch (error: any) {
+                message.error('定位失败: ' + (error.message || String(error)));
+            }
         }
     };
     
@@ -166,7 +243,11 @@ const SelectionOptimizationPage = () => {
                             <p>优化内容与原内容相同，无需替换</p>
                             <Button 
                                 size="large" 
-                                onClick={() => setShowResults(false)}
+                                onClick={() => {
+                                    restoreOriginalStyle();
+                                    setIsActive(false);
+                                    setShowResults(false);
+                                }}
                                 style={{ marginTop: '15px' }}
                             >
                                 返回
@@ -191,14 +272,16 @@ const SelectionOptimizationPage = () => {
                         margin: '0 auto',
                         cursor: 'pointer',
                         transition: 'all 0.3s',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                        borderWidth: '1px',
+                        boxShadow: isActive ? '0 0 10px rgba(24, 144, 255, 0.8)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
+                        borderWidth: isActive ? '2px' : '1px',
+                        borderColor: isActive ? '#1890ff' : '',
                         animation: 'fadeInUp 0.5s ease'
                     }}
                     bodyStyle={{
                         padding: '16px',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        background: isActive ? '#f0f8ff' : ''
                     }}
                     hoverable
                     onClick={handleLocateInDocument}
@@ -212,7 +295,7 @@ const SelectionOptimizationPage = () => {
                         }}>
                             <h4 style={{ margin: 0 }}>原始内容:</h4>
                             <Tooltip title="定位到文档">
-                                <AimOutlined style={{ color: '#52c41a' }} />
+                                <AimOutlined style={{ color: isActive ? '#1890ff' : '#52c41a' }} />
                             </Tooltip>
                         </div>
                         <Tooltip title={originalItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
@@ -258,6 +341,8 @@ const SelectionOptimizationPage = () => {
                                 <Button 
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        restoreOriginalStyle();
+                                        setIsActive(false);
                                         setShowResults(false);
                                     }}
                                 >

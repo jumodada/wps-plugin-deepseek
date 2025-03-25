@@ -10,8 +10,12 @@ dayjs.locale('zh-cn')
 
 const Bootstrap = () => {
   useEffect(() => {
+    // 初始化全局对象
     window.ribbon = ribbon;
     window._Application = window.Application;
+    
+    // 注意：页面级别的监听器应当在各个页面中使用usePageReset钩子来管理
+    // 这样可以确保在组件卸载时正确移除监听器
   }, []);
 
   return <RouterProvider router={router} />;
