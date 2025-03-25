@@ -193,44 +193,6 @@ const ArticleOptimizationPage = () => {
         });
     };
 
-    // 应用高亮样式到所有段落
-    const applyHighlightToAllParagraphs = () => {
-        try {
-            const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
-
-            for (const item of optimizedData) {
-                // 跳过不需要优化的项
-                if (item.notImprove) continue;
-
-                for (let j = 1; j <= paragraphCount; j++) {
-                    try {
-                        const paragraph = window._Application.ActiveDocument.Paragraphs.Item(j);
-                        if (paragraph.ParaID === item.id) {
-                            // 保存原始样式，处理9999999的情况
-                            const underline = paragraph.Range.Font.Underline;
-                            const color = paragraph.Range.Font.Color;
-                            
-                            // 保存到独立的Map中
-                            originalStylesMap.current.set(item.id, {
-                                underline: underline === 9999999 ? 0 : underline,
-                                color: color === 9999999 ? 0 : color
-                            });
-                            
-                            // 应用高亮样式
-                            paragraph.Range.Font.Underline = 11; // 设置下划线
-                            paragraph.Range.Font.Color = 255;   // 设置颜色为红色
-                            break;
-                        }
-                    } catch (error) {
-                        continue;
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('应用高亮样式时出错:', error);
-        }
-    };
-
     const handleCancel = () => {
         if (cancelTokenRef.current) {
             cancelTokenRef.current.abort();
@@ -335,7 +297,7 @@ const ArticleOptimizationPage = () => {
                                 parsedData.push({
                                     id,
                                     text: optimizedText,
-                                    notImprove: notImproveMatch ? true : false
+                                    notImprove: !!notImproveMatch
                                 });
                             }
                         }
@@ -359,7 +321,7 @@ const ArticleOptimizationPage = () => {
                 }
 
                 console.error('处理文档时出错:', error);
-                message.error(typeof error === 'object' && error !== null && 'message' in error
+                message.error(typeof error === 'object' && true && 'message' in error
                     ? String(error.message)
                     : '请求失败，请检查网络连接或API配置');
             }
@@ -368,7 +330,7 @@ const ArticleOptimizationPage = () => {
                 return;
             }
 
-            message.error(typeof error === 'object' && error !== null && 'message' in error
+            message.error(typeof error === 'object' && true && 'message' in error
                 ? String(error.message)
                 : '请求失败，请检查网络连接或API配置');
         } finally {
@@ -453,8 +415,8 @@ const ArticleOptimizationPage = () => {
                     const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
                     try {
                         if (paragraph.ParaID === originalItem.id) {
-                            // 保存原始样式
-                            const originalStyle = paragraph.Style;
+                            const originalStyle = {...paragraph.Style};
+                            const originalFont = {...paragraph.Style.Font};
                             const CharacterUnitFirstLineIndent = paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent;
                             const CharacterUnitLeftIndent = paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent;
                             const firstLineIndent = paragraph.Range.ParagraphFormat.FirstLineIndent;
@@ -464,6 +426,7 @@ const ArticleOptimizationPage = () => {
                             }
                             paragraph.Range.Text = newText;
                             paragraph.Style = originalStyle;
+                            paragraph.Style.Font = originalFont;
                             paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
                             paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
                             paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
