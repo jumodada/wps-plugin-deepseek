@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { message, Card, Row, Col, Space, Tooltip, Spin, Collapse } from 'antd';
 import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
-import { submitOptimization } from '../api/deepseek';
+import { submitOptimization, generateDiffAnalysis } from '../api/deepseek';
 import { usePageReset } from '../hooks';
 
 const extractParagraphsFromDocument = (): { id: string, text: string }[] => {
@@ -53,12 +53,14 @@ const ArticleOptimizationPage = () => {
     const [optimizedData, setOptimizedData] = useState<{ 
         id: string, 
         text: string, 
+        diff?: string[],
         notImprove?: boolean 
     }[]>([]);
     const [showResults, setShowResults] = useState(false);
     const [replacedItems, setReplacedItems] = useState<Set<string>>(new Set());
     const [activeCardId, setActiveCardId] = useState<string | null>(null);
-
+    const [activeDocumentName, setActiveDocumentName] = useState<string | null>(null);
+    
     const handleReset = () => {
         setLoading(false);
         setProcessingStatus('');
@@ -103,6 +105,42 @@ const ArticleOptimizationPage = () => {
         });
     };
 
+    // 保留一个简化版的highlightTextChanges作为备选方案
+    const highlightTextChanges = (originalText: string, optimizedText: string) => {
+        // 简单的差异展示逻辑
+        const cleanOriginalText = originalText.replace(/\r/g, '');
+        const cleanOptimizedText = optimizedText.replace(/\r/g, '');
+        
+        if (cleanOriginalText === cleanOptimizedText) {
+            return { changesSummary: '' };
+        }
+        
+        // 如果原文和优化后文本长度相近，假定为词语替换
+        if (Math.abs(cleanOriginalText.length - cleanOptimizedText.length) < Math.min(cleanOriginalText.length, cleanOptimizedText.length) * 0.3) {
+            return { 
+                changesSummary: `<span style="color: #FF8080; text-decoration: line-through;">原文</span> → <span style="color: #52c41a;">优化后</span>` 
+            };
+        }
+        
+        // 如果优化后文本较长，假定为添加内容
+        if (cleanOptimizedText.length > cleanOriginalText.length * 1.3) {
+            return { 
+                changesSummary: `<span style="color: #52c41a;">+添加了内容</span>` 
+            };
+        }
+        
+        // 如果优化后文本较短，假定为删减内容
+        if (cleanOptimizedText.length < cleanOriginalText.length * 0.7) {
+            return { 
+                changesSummary: `<span style="color: #FF8080; text-decoration: line-through;">删减了内容</span>` 
+            };
+        }
+        
+        // 默认返回通用提示
+        return { 
+            changesSummary: `<span style="color: #1890ff;">文本已优化</span>` 
+        };
+    };
 
     const handleStartProcess = async () => {
         cancelTokenRef.current = new AbortController();
@@ -128,75 +166,177 @@ const ArticleOptimizationPage = () => {
         setOriginalData(structuredData);
         setProcessingStatus(`正在处理文档内容...`);
 
-        const formatInstruction = '，保持原意和格式';
-        const structuredInputJSON = JSON.stringify(structuredData);
-
-        const params = {
-            messages: [
-                {
-                    role: "system",
-                    content: `你是一个专业的文章优化助手。请仅对文本进行词语替换和优化，不要添加大量新文本。对于数组中的第一个元素（如果存在），视为标题，不要增加其字数。如果判断某段文本不需要优化，请滤除这一条。${formatInstruction}`
-                },
-                {
-                    role: "user",
-                    content: `请对以下JSON格式的文章内容进行优化，返回优化后的JSON格式内容, 如果判断某段文本不需要优化，请在JSON数据里面滤除这条。只做词语的替换和优化，不要添加额外的大量文本：\n\n${structuredInputJSON}`
-                }
-            ],
-            model: "deepseek-reasoner",
-            signal: cancelTokenRef.current?.signal
-        };
-
-        const response = await retryOptimization(params);
-
-        if (processingRef.current && response.data && response.data.choices && response.data.choices.length > 0) {
-            const result = response.data.choices[0].message.content;
-
-            const jsonMatch = result.match(/(\[.*\])/s);
-            const jsonStr = jsonMatch ? jsonMatch[1] : result;
-
-            const resultData = JSON.parse(jsonStr);
-
-            if (Array.isArray(resultData)) {
-                const processedData = resultData.map(item => ({
-                    ...item,
-                    text: item.text.replace(/\r$/, '')
-                }));
-                setOptimizedData(processedData);
-            } else {
-                const resultBlocks = result.split(/\n\s*\n/);
-                const parsedData: { id: string, text: string, notImprove?: boolean }[] = [];
-
-                for (const block of resultBlocks) {
-                    const idMatch = block.match(/ID:\s*([^\n]+)/);
-                    const contentMatch = block.match(/内容:\s*([\s\S]+)$/);
-                    const notImproveMatch = block.match(/不需要优化/i) || block.match(/保持原样/i);
-
-                    if (idMatch && contentMatch) {
-                        const id = idMatch[1].trim();
-                        const optimizedText = contentMatch[1].trim().replace(/\r$/, '');
-
-                        parsedData.push({
-                            id,
-                            text: optimizedText,
-                            notImprove: !!notImproveMatch
-                        });
+        try {
+            // 第一次调用API进行文本优化
+            const params = {
+                messages: [
+                    {
+                        role: "system",
+                        content: `你是一个专业的文章优化助手。请仅对文本进行词语替换和优化，不要添加大量新文本。对于数组中的第一个元素（如果存在），视为标题，不要增加其字数。如果判断某段文本不需要优化，请滤除这一条。`
+                    },
+                    {
+                        role: "user",
+                        content: `请对以下JSON格式的文章内容进行优化，返回优化后的JSON格式内容，如果判断某段文本不需要优化，请在JSON数据里面滤除这条：\n\n${JSON.stringify(structuredData)}`
                     }
-                }
+                ],
+                model: "deepseek-reasoner",
+                signal: cancelTokenRef.current?.signal
+            };
 
-                if (parsedData.length > 0) {
-                    setOptimizedData(parsedData);
-                } else {
-                    setOptimizedData(structuredData.map(item => ({ ...item, notImprove: true })));
-                    message.warning('无法解析优化结果，将显示原始内容');
-                }
+            const response = await retryOptimization(params);
+
+            if (!processingRef.current) {
+                setLoading(false);
+                return;
             }
 
-            setShowResults(true);
+            if (response.data && response.data.choices && response.data.choices.length > 0) {
+                const result = response.data.choices[0].message.content;
+                const jsonMatch = result.match(/(\[.*\])/s);
+                const jsonStr = jsonMatch ? jsonMatch[1] : result;
+                
+                try {
+                    let optimizedItems: Array<{ id: string, text: string, notImprove?: boolean }> = [];
+                    
+                    const resultData = JSON.parse(jsonStr);
+                    if (Array.isArray(resultData)) {
+                        optimizedItems = resultData.map(item => ({
+                            ...item,
+                            text: item.text.replace(/\r$/, '')
+                        }));
+                    } else {
+                        const resultBlocks = result.split(/\n\s*\n/);
+                        for (const block of resultBlocks) {
+                            const idMatch = block.match(/ID:\s*([^\n]+)/);
+                            const contentMatch = block.match(/内容:\s*([\s\S]+)$/);
+                            const notImproveMatch = block.match(/不需要优化/i) || block.match(/保持原样/i);
+
+                            if (idMatch && contentMatch) {
+                                const id = idMatch[1].trim();
+                                const optimizedText = contentMatch[1].trim().replace(/\r$/, '');
+
+                                optimizedItems.push({
+                                    id,
+                                    text: optimizedText,
+                                    notImprove: !!notImproveMatch
+                                });
+                            }
+                        }
+                    }
+                    
+                    // 如果没有有效项目，使用原始内容
+                    if (optimizedItems.length === 0) {
+                        setOptimizedData(structuredData.map(item => ({ ...item, notImprove: true })));
+                        message.warning('没有可优化的内容');
+                        setShowResults(true);
+                        setLoading(false);
+                        return;
+                    }
+                    
+                    // 第二步：为每个优化项生成差异分析
+                    setProcessingStatus('正在分析文本差异...');
+                    
+                    const itemsWithDiff: Array<{ id: string, text: string, diff: string[], notImprove?: boolean }> = [];
+                    const originalItemMap = new Map(structuredData.map(item => [item.id, item]));
+                    
+                    // 对有变化的项目进行差异分析
+                    for (const optimizedItem of optimizedItems) {
+                        const originalItem = originalItemMap.get(optimizedItem.id);
+                        if (!originalItem || optimizedItem.notImprove || originalItem.text.trim() === optimizedItem.text.trim()) {
+                            // 无需差异分析的项目
+                            itemsWithDiff.push({
+                                ...optimizedItem,
+                                diff: []
+                            });
+                            continue;
+                        }
+                        
+                        try {
+                            const diffResponse = await generateDiffAnalysis({
+                                original: originalItem.text,
+                                optimized: optimizedItem.text,
+                                signal: cancelTokenRef.current?.signal
+                            });
+                            
+                            if (!processingRef.current) {
+                                setLoading(false);
+                                return;
+                            }
+                            
+                            if (diffResponse.data && diffResponse.data.choices && diffResponse.data.choices.length > 0) {
+                                const diffResult = diffResponse.data.choices[0].message.content;
+                                
+                                // 解析返回的差异数组
+                                try {
+                                    // 尝试直接解析JSON格式
+                                    const diffArray = JSON.parse(diffResult);
+                                    itemsWithDiff.push({
+                                        ...optimizedItem,
+                                        diff: Array.isArray(diffArray) ? diffArray : []
+                                    });
+                                } catch (e) {
+                                    // 尝试从文本中提取JSON
+                                    const jsonMatch = diffResult.match(/(\[.*\])/s);
+                                    if (jsonMatch) {
+                                        try {
+                                            const diffArray = JSON.parse(jsonMatch[1]);
+                                            itemsWithDiff.push({
+                                                ...optimizedItem,
+                                                diff: Array.isArray(diffArray) ? diffArray : []
+                                            });
+                                        } catch (e2) {
+                                            // 如果无法解析，添加没有差异的项
+                                            itemsWithDiff.push({
+                                                ...optimizedItem,
+                                                diff: []
+                                            });
+                                        }
+                                    } else {
+                                        // 没有找到JSON格式
+                                        itemsWithDiff.push({
+                                            ...optimizedItem,
+                                            diff: []
+                                        });
+                                    }
+                                }
+                            } else {
+                                // 没有返回有效结果
+                                itemsWithDiff.push({
+                                    ...optimizedItem,
+                                    diff: []
+                                });
+                            }
+                        } catch (error: any) {
+                            // 差异分析失败
+                            console.error('差异分析失败:', error);
+                            itemsWithDiff.push({
+                                ...optimizedItem,
+                                diff: []
+                            });
+                        }
+                    }
+                    
+                    setOptimizedData(itemsWithDiff);
+                    setShowResults(true);
+                    setLoading(false);
+                    message.success('处理完成！请查看优化结果并选择是否替换。');
+                } catch (error) {
+                    console.error('解析结果失败:', error);
+                    setOptimizedData(structuredData.map(item => ({ ...item, notImprove: true })));
+                    setShowResults(true);
+                    setLoading(false);
+                    message.warning('无法解析优化结果，将显示原始内容');
+                }
+            } else {
+                setLoading(false);
+                message.error('处理失败，请重试');
+            }
+        } catch (error: any) {
+            console.error('处理失败:', error);
             setLoading(false);
-            message.success('处理完成！请查看优化结果并选择是否替换。');
-        } else {
-            setLoading(false);
-            message.error('处理失败，请重试');
+            if (error.name !== 'AbortError') {
+                message.error('处理失败，请重试');
+            }
         }
     };
 
@@ -332,77 +472,34 @@ const ArticleOptimizationPage = () => {
         );
     };
 
-    // 创建一个函数来高亮显示文本中的变化
-    const highlightTextChanges = (originalText: string, optimizedText: string) => {
-        const cleanOriginalText = originalText.replace(/\r/g, '');
-        const cleanOptimizedText = optimizedText.replace(/\r/g, '');
-
-        const splitIntoTokens = (text: string) => {
-            return text.split(/([,.!?;:""''（）、。，！？；：\s]+)/).filter(Boolean);
-        };
-
-        const originalTokens = splitIntoTokens(cleanOriginalText);
-        const optimizedTokens = splitIntoTokens(cleanOptimizedText);
-
-        const findCommonSubsequence = (arr1: string[], arr2: string[]) => {
-            const lcs = Array(arr1.length + 1).fill(null).map(() =>
-                Array(arr2.length + 1).fill(0)
-            );
-
-            for (let i = 1; i <= arr1.length; i++) {
-                for (let j = 1; j <= arr2.length; j++) {
-                    if (arr1[i - 1] === arr2[j - 1]) {
-                        lcs[i][j] = lcs[i - 1][j - 1] + 1;
-                    } else {
-                        lcs[i][j] = Math.max(lcs[i - 1][j], lcs[i][j - 1]);
-                    }
-                }
-            }
-
-            const changes: { original: number, optimized: number }[] = [];
-            let i = arr1.length, j = arr2.length;
-
-            while (i > 0 && j > 0) {
-                if (arr1[i - 1] === arr2[j - 1]) {
-                    i--; j--;
-                } else if (lcs[i - 1][j] >= lcs[i][j - 1]) {
-                    changes.push({ original: i - 1, optimized: -1 });
-                    i--;
-                } else {
-                    changes.push({ original: -1, optimized: j - 1 });
-                    j--;
-                }
-            }
-
-            while (i > 0) {
-                changes.push({ original: i - 1, optimized: -1 });
-                i--;
-            }
-
-            while (j > 0) {
-                changes.push({ original: -1, optimized: j - 1 });
-                j--;
-            }
-
-            return changes.reverse();
-        };
-
-        const changes = findCommonSubsequence(originalTokens, optimizedTokens);
-
-        let result = '';
-
-        for (let i = 0; i < optimizedTokens.length; i++) {
-            const token = optimizedTokens[i];
-            if (changes.some(c => c.optimized === i && c.original === -1)) {
-                result += `<span style="color: #FF8080; font-weight: bold;">${token}</span>`;
-            } else if (changes.some(c => c.optimized === i && c.original !== -1)) {
-                result += `<span style="color: #FF8080; font-weight: bold;">${token}</span>`;
-            } else {
-                result += token;
-            }
+    // 替换highlightTextChanges函数，使用deepseek返回的diff数据
+    const renderDiffChanges = (diffArray?: string[]) => {
+        if (!diffArray || diffArray.length === 0) {
+            return { changesSummary: '' };
         }
-
-        return result;
+        
+        // 将diff数组转换为HTML
+        const changesSummary = diffArray.map(diff => {
+            // 处理替换模式: "A → B"
+            if (diff.includes('→')) {
+                const [original, optimized] = diff.split('→').map(s => s.trim());
+                return `<span style="color: #FF8080; text-decoration: line-through;">${original}</span> → <span style="color: #52c41a;">${optimized}</span>`;
+            }
+            // 处理删除模式: "-A" 或 "删除A"
+            else if (diff.startsWith('-') || diff.includes('删除')) {
+                const deletedText = diff.startsWith('-') ? diff.substring(1).trim() : diff.replace(/删除/g, '').trim();
+                return `<span style="color: #FF8080; text-decoration: line-through;">${deletedText}</span>`;
+            }
+            // 处理添加模式: "+A" 或 "添加A"
+            else if (diff.startsWith('+') || diff.includes('添加')) {
+                const addedText = diff.startsWith('+') ? diff.substring(1).trim() : diff.replace(/添加/g, '').trim();
+                return `<span style="color: #52c41a;">+${addedText}</span>`;
+            }
+            // 其他情况直接显示
+            return `<span>${diff}</span>`;
+        }).join(', ');
+        
+        return { changesSummary };
     };
 
     const renderComparisonCards = () => {
@@ -466,7 +563,12 @@ const ArticleOptimizationPage = () => {
                                 const optimizedItem = optimizedData.find(opt => opt.id === item.id);
                                 if (!optimizedItem || optimizedItem.notImprove) return null;
 
-                                const highlightedText = highlightTextChanges(item.text, optimizedItem.text);
+                                // 使用deepseek返回的diff数据生成差异摘要
+                                const { changesSummary } = renderDiffChanges(optimizedItem.diff);
+                                
+                                // 如果没有diff数据，回退到前端计算差异
+                                const diffDisplay = changesSummary || highlightTextChanges(item.text, optimizedItem.text).changesSummary;
+                                
                                 const isActive = activeCardId === item.id;
 
                                 return (
@@ -497,6 +599,19 @@ const ArticleOptimizationPage = () => {
                                             onClick={() => handleLocateInDocument(item.id)}
                                         >
                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                                {diffDisplay && (
+                                                    <div 
+                                                        style={{
+                                                            fontSize: '12px',
+                                                            marginBottom: '8px',
+                                                            padding: '6px',
+                                                            borderRadius: '4px',
+                                                            background: '#f9f9f9',
+                                                            borderLeft: '2px solid #1890ff'
+                                                        }}
+                                                        dangerouslySetInnerHTML={{ __html: diffDisplay }}
+                                                    />
+                                                )}
                                                 <Tooltip title={optimizedItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
                                                     <div
                                                         style={{
@@ -509,8 +624,9 @@ const ArticleOptimizationPage = () => {
                                                             marginBottom: '16px',
                                                             textDecoration: replacedItems.has(item.id) ? 'line-through' : 'none'
                                                         }}
-                                                        dangerouslySetInnerHTML={{ __html: highlightedText }}
-                                                    />
+                                                    >
+                                                        {optimizedItem.text}
+                                                    </div>
                                                 </Tooltip>
 
                                                 <div style={{ textAlign: 'left', marginTop: 'auto', display: 'flex', justifyContent: 'flex-start', gap: '15px' }}>
@@ -574,10 +690,37 @@ const ArticleOptimizationPage = () => {
     }, [activeCardId]);
 
     useEffect(() => {
-        if(optimizedData.length === 0 && !loading) {
-        handleStartProcess();
+        if(!loading) {
+            handleStartProcess();
         }
     }, []);
+
+    // 监听文档名称变化
+    useEffect(() => {
+        const checkDocumentName = () => {
+            if (isWordDocument()) {
+                const currentDocName = window._Application.ActiveDocument.Name;
+                if (activeDocumentName !== currentDocName) {
+                    setActiveDocumentName(currentDocName);
+                    if (activeDocumentName !== null) { // 不是首次设置才重新处理
+                        handleStartProcess();
+                    }
+                }
+            }
+        };
+
+        // 初始设置文档名
+        if (isWordDocument()) {
+            setActiveDocumentName(window._Application.ActiveDocument.Name);
+        }
+
+        // 设置定时检查
+        const intervalId = setInterval(checkDocumentName, 1000);
+        
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, [activeDocumentName]);
 
     return (
         <div style={{ padding: '5px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#f0f2f5', color: '#333' }}>

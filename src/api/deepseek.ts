@@ -58,3 +58,30 @@ export const submitOptimization = (params: DeepSeekRequest) => {
     signal: params.signal 
   });
 };
+
+// 生成文本差异分析
+export const generateDiffAnalysis = (params: {
+  original: string;
+  optimized: string;
+  model?: string;
+  signal?: AbortSignal;
+}) => {
+  return apiClient.post<DeepSeekResponse>('/v1/chat/completions', {
+    messages: [
+      {
+        role: "system",
+        content: "你是一个专业的文本差异分析工具，你的任务是对比原文和优化后的文本，找出精确的修改点，用简洁明了的方式表示差异。"
+      },
+      {
+        role: "user",
+        content: `请分析以下原文和优化后文本之间的差异，返回一个JSON格式的diff数组，每个元素表示一个修改点（如词语替换、删除、添加）：\n\n原文：${params.original}\n\n优化后：${params.optimized}\n\n请用这样的格式表示差异点：\n1. 替换：使用"原词 → 新词"\n2. 删除：使用"-删除的内容"\n3. 添加：使用"+添加的内容"\n\n请直接返回JSON格式：["差异点1", "差异点2", ...]`
+      }
+    ],
+    model: params.model || "deepseek-chat",
+    temperature: 0.5,
+    stream: false,
+    max_tokens: 4096,
+  }, {
+    signal: params.signal
+  });
+};

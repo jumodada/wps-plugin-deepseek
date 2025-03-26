@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button, message, Progress, Card, Space, Tooltip } from 'antd';
-import { StopOutlined, SyncOutlined, AimOutlined } from '@ant-design/icons';
+import { StopOutlined, SyncOutlined, AimOutlined, PlusOutlined } from '@ant-design/icons';
 import { 
     isWordDocument,
     extractSelectedText,
@@ -8,14 +8,481 @@ import {
     locateParagraphInDocument,
     injectOptimizationStyles
 } from '../tool/optimization';
+import { submitOptimization, generateDiffAnalysis } from '../api/deepseek';
 import { usePageReset } from '../hooks';
+
+// 添加优化的差异检测函数
+const highlightTextDifferences = (originalText: string, optimizedText: string) => {
+    const cleanOriginalText = originalText.replace(/\r/g, '');
+    const cleanOptimizedText = optimizedText.replace(/\r/g, '');
+
+    // 首先比较完整文本，检查是否相似度很高
+    const isSimilarText = (s1: string, s2: string): boolean => {
+        // 如果长度差异过大，则认为不相似
+        if (Math.abs(s1.length - s2.length) > Math.min(s1.length, s2.length) * 0.5) {
+            return false;
+        }
+        
+        // 计算相同字符的数量
+        let sameChars = 0;
+        for (let i = 0; i < Math.min(s1.length, s2.length); i++) {
+            if (s1[i] === s2[i]) sameChars++;
+        }
+        
+        // 如果有超过70%的字符相同，则认为相似
+        return sameChars / Math.max(s1.length, s2.length) > 0.7;
+    };
+    
+    // 查找共同前缀和后缀，优化相似文本的差异展示
+    const findCommonBoundaries = (s1: string, s2: string): { prefix: string, s1Core: string, s2Core: string, suffix: string } => {
+        // 找共同前缀
+        let prefixLength = 0;
+        while (prefixLength < Math.min(s1.length, s2.length) && s1[prefixLength] === s2[prefixLength]) {
+            prefixLength++;
+        }
+        
+        // 找共同后缀
+        let suffixLength = 0;
+        while (
+            suffixLength < Math.min(s1.length - prefixLength, s2.length - prefixLength) &&
+            s1[s1.length - 1 - suffixLength] === s2[s2.length - 1 - suffixLength]
+        ) {
+            suffixLength++;
+        }
+        
+        // 提取核心差异部分
+        const prefix = s1.substring(0, prefixLength);
+        const s1Core = s1.substring(prefixLength, s1.length - suffixLength);
+        const s2Core = s2.substring(prefixLength, s2.length - suffixLength);
+        const suffix = s1.substring(s1.length - suffixLength);
+        
+        return { prefix, s1Core, s2Core, suffix };
+    };
+
+    // 中文分词函数 - 基础实现，按1-4个字符的长度划分可能的词语
+    const segmentChinese = (text: string): string[] => {
+        const words: string[] = [];
+        let startIdx = 0;
+        
+        // 简单的汉字、数字、字母识别正则
+        const charTypePattern = /[\u4e00-\u9fa5]|[0-9]|[a-zA-Z]/;
+        
+        while (startIdx < text.length) {
+            // 如果是标点或空格，作为单独的token
+            if (!charTypePattern.test(text[startIdx])) {
+                words.push(text[startIdx]);
+                startIdx++;
+                continue;
+            }
+            
+            // 尝试找最长的连续同类型字符作为词语
+            let endIdx = startIdx + 1;
+            const charType = text[startIdx].match(/[\u4e00-\u9fa5]/) ? 'chinese' : 
+                             text[startIdx].match(/[0-9]/) ? 'digit' : 'letter';
+            
+            while (endIdx < text.length) {
+                const currentCharType = text[endIdx].match(/[\u4e00-\u9fa5]/) ? 'chinese' : 
+                                       text[endIdx].match(/[0-9]/) ? 'digit' : 
+                                       text[endIdx].match(/[a-zA-Z]/) ? 'letter' : 'other';
+                
+                if (currentCharType !== charType) break;
+                
+                // 对于汉字，最多取4个字符为一个词语
+                // 对于数字和字母，可以继续连接
+                if (charType === 'chinese' && endIdx - startIdx >= 3) break;
+                
+                endIdx++;
+            }
+            
+            words.push(text.substring(startIdx, endIdx));
+            startIdx = endIdx;
+        }
+        
+        return words;
+    };
+    
+    // 词语级别的差异比较
+    const compareWords = (s1Core: string, s2Core: string): { 
+        replacements: { original: string, optimized: string }[],
+        deletions: string[],
+        additions: string[]
+    } => {
+        // 分词
+        const words1 = segmentChinese(s1Core);
+        const words2 = segmentChinese(s2Core);
+        
+        // 查找最长公共子序列
+        const lcsTable = Array(words1.length + 1).fill(null).map(() => 
+            Array(words2.length + 1).fill(0)
+        );
+        
+        for (let i = 1; i <= words1.length; i++) {
+            for (let j = 1; j <= words2.length; j++) {
+                if (words1[i - 1] === words2[j - 1]) {
+                    lcsTable[i][j] = lcsTable[i - 1][j - 1] + 1;
+                } else {
+                    lcsTable[i][j] = Math.max(lcsTable[i - 1][j], lcsTable[i][j - 1]);
+                }
+            }
+        }
+        
+        // 从LCS表中提取操作序列
+        const operations: { type: 'match' | 'delete' | 'add', word: string }[] = [];
+        let i = words1.length, j = words2.length;
+        
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && words1[i - 1] === words2[j - 1]) {
+                operations.unshift({ type: 'match', word: words1[i - 1] });
+                i--; j--;
+            } else if (j > 0 && (i === 0 || lcsTable[i][j - 1] >= lcsTable[i - 1][j])) {
+                operations.unshift({ type: 'add', word: words2[j - 1] });
+                j--;
+            } else {
+                operations.unshift({ type: 'delete', word: words1[i - 1] });
+                i--;
+            }
+        }
+        
+        // 分析操作序列，识别替换
+        const result = {
+            replacements: [] as { original: string, optimized: string }[],
+            deletions: [] as string[],
+            additions: [] as string[]
+        };
+        
+        for (let i = 0; i < operations.length; i++) {
+            const op = operations[i];
+            
+            if (op.type === 'delete' && i + 1 < operations.length && operations[i + 1].type === 'add') {
+                // 识别为替换
+                result.replacements.push({
+                    original: op.word,
+                    optimized: operations[i + 1].word
+                });
+                i++; // 跳过下一个add操作
+            } else if (op.type === 'delete') {
+                result.deletions.push(op.word);
+            } else if (op.type === 'add') {
+                result.additions.push(op.word);
+            }
+        }
+        
+        return result;
+    };
+    
+    // 尝试直接识别简单模式的变化，如"直播间配置"到"直播间设置"
+    if (isSimilarText(cleanOriginalText, cleanOptimizedText)) {
+        const { prefix, s1Core, s2Core, suffix } = findCommonBoundaries(cleanOriginalText, cleanOptimizedText);
+        
+        // 如果发现了明确的前缀和后缀，并且核心差异部分较小，直接显示简单替换
+        if ((prefix.length > 0 || suffix.length > 0) && s1Core.length <= 10 && s2Core.length <= 10) {
+            // 这里直接返回简单的差异展示
+            const changesSummary = `<span style="color: #FF8080; text-decoration: line-through;">${s1Core}</span> → <span style="color: #52c41a;">${s2Core}</span>`;
+            
+            return { changesSummary };
+        }
+        // 差异较大但仍有明确前后缀，尝试词语级别比较
+        else if (prefix.length > 0 || suffix.length > 0) {
+            const wordComparison = compareWords(s1Core, s2Core);
+            
+            // 如果有明确的词语替换模式，使用词语级别的展示
+            if (wordComparison.replacements.length > 0 || 
+                wordComparison.deletions.length > 0 || 
+                wordComparison.additions.length > 0) {
+                
+                // 生成变化摘要
+                let changesSummary = '';
+                
+                // 处理替换
+                if (wordComparison.replacements.length > 0) {
+                    const replaceItems = wordComparison.replacements.map(r => 
+                        `<span style="color: #FF8080; text-decoration: line-through;">${r.original}</span> → <span style="color: #52c41a;">${r.optimized}</span>`
+                    );
+                    changesSummary += replaceItems.join(', ');
+                }
+                
+                // 处理删除
+                if (wordComparison.deletions.length > 0) {
+                    if (changesSummary) changesSummary += ' | ';
+                    const deleteItems = wordComparison.deletions.map(d => 
+                        `<span style="color: #FF8080; text-decoration: line-through;">${d}</span>`
+                    );
+                    changesSummary += deleteItems.join(', ');
+                }
+                
+                // 处理新增
+                if (wordComparison.additions.length > 0) {
+                    if (changesSummary) changesSummary += ' | ';
+                    const addItems = wordComparison.additions.map(a => 
+                        `<span style="color: #52c41a;"><PlusOutlined style="fontSize: 10px"/> ${a}</span>`
+                    );
+                    changesSummary += addItems.join(', ');
+                }
+                
+                return { changesSummary };
+            }
+        }
+    }
+
+    // 如果不是简单模式，使用详细的字符级别差异检测
+    // 使用更小的粒度进行拆分，能捕获单个字符级别的变化
+    const getTokens = (text: string) => {
+        // 先按照标点符号和空格拆分，然后对每个词进一步拆分为字符
+        const words = text.split(/([,.!?;:""''（）、。，！？；：\s]+)/);
+        const tokens: { text: string, isDelimiter: boolean, index: number }[] = [];
+        let globalIndex = 0;
+        
+        words.forEach(word => {
+            if (!word) return;
+            
+            const isDelimiter = /^[,.!?;:""''（）、。，！？；：\s]+$/.test(word);
+            
+            if (isDelimiter) {
+                tokens.push({ text: word, isDelimiter: true, index: globalIndex });
+                globalIndex += word.length;
+            } else {
+                // 对普通词再拆分为单个字符
+                for (let i = 0; i < word.length; i++) {
+                    tokens.push({ text: word[i], isDelimiter: false, index: globalIndex });
+                    globalIndex++;
+                }
+            }
+        });
+        
+        return tokens;
+    };
+
+    const originalTokens = getTokens(cleanOriginalText);
+    const optimizedTokens = getTokens(cleanOptimizedText);
+
+    // 使用Myers差分算法找出最小编辑序列
+    const computeDiff = (a: typeof originalTokens, b: typeof optimizedTokens) => {
+        const MAX = a.length + b.length;
+        const v = new Array(2 * MAX + 1).fill(0);
+        const trace: number[][] = [];
+        
+        let x, y;
+        const findPath = () => {
+            for (let d = 0; d <= MAX; d++) {
+                trace.push([...v]);
+                
+                for (let k = -d; k <= d; k += 2) {
+                    if (k === -d || (k !== d && v[k-1+MAX] < v[k+1+MAX])) {
+                        x = v[k+1+MAX];
+                    } else {
+                        x = v[k-1+MAX] + 1;
+                    }
+                    
+                    y = x - k;
+                    
+                    while (x < a.length && y < b.length && 
+                           a[x].text === b[y].text && 
+                           a[x].isDelimiter === b[y].isDelimiter) {
+                        x++;
+                        y++;
+                    }
+                    
+                    v[k+MAX] = x;
+                    
+                    if (x >= a.length && y >= b.length) {
+                        return d;
+                    }
+                }
+            }
+            return -1;
+        };
+        
+        const d = findPath();
+        
+        // 构建编辑脚本
+        const backtrack = (x: number, y: number, d: number, edits: { op: string, aIndex?: number, bIndex?: number }[]) => {
+            if (d === 0) return;
+            
+            const k = x - y;
+            const kPrev = trace[d-1][k+MAX];
+            
+            let prevK;
+            if (k === -d || (k !== d && trace[d-1][k-1+MAX] < trace[d-1][k+1+MAX])) {
+                prevK = k + 1;
+            } else {
+                prevK = k - 1;
+            }
+            
+            const prevX = trace[d-1][prevK+MAX];
+            const prevY = prevX - prevK;
+            
+            // 先递归处理前面的部分
+            backtrack(prevX, prevY, d-1, edits);
+            
+            if (prevK > k) {
+                // 插入操作 (来自B但不在A中)
+                edits.push({ op: 'add', bIndex: prevY });
+            } else if (prevK < k) {
+                // 删除操作 (在A中但不在B中)
+                edits.push({ op: 'del', aIndex: prevX });
+            } else {
+                // 匹配操作
+                for (let i = prevX; i < x; i++) {
+                    edits.push({ op: 'match', aIndex: i, bIndex: prevY + (i - prevX) });
+                }
+            }
+        };
+        
+        const edits: { op: string, aIndex?: number, bIndex?: number }[] = [];
+        backtrack(a.length, b.length, d, edits);
+        
+        return edits;
+    };
+
+    const edits = computeDiff(originalTokens, optimizedTokens);
+    
+    // 处理编辑脚本，识别出替换、删除和新增
+    const replacementGroups: {
+        original: string, 
+        optimized: string, 
+        origIndexes: number[],
+        optIndexes: number[]
+    }[] = [];
+    
+    let currentReplacement: {
+        original: string, 
+        optimized: string,
+        origIndexes: number[],
+        optIndexes: number[]
+    } | null = null;
+
+    // 根据编辑脚本生成差异信息
+    const deletions: { text: string, index: number }[] = [];
+    const additions: { text: string, index: number }[] = [];
+
+    for (let i = 0; i < edits.length; i++) {
+        const edit = edits[i];
+        
+        if (edit.op === 'del') {
+            const token = originalTokens[edit.aIndex!];
+            if (!token.isDelimiter) {
+                deletions.push({ text: token.text, index: token.index });
+                
+                // 查看下一个操作是否是添加，如果是则可能是替换
+                if (i + 1 < edits.length && edits[i+1].op === 'add') {
+                    const nextToken = optimizedTokens[edits[i+1].bIndex!];
+                    if (!nextToken.isDelimiter) {
+                        if (currentReplacement === null) {
+                            currentReplacement = {
+                                original: token.text,
+                                optimized: nextToken.text,
+                                origIndexes: [token.index],
+                                optIndexes: [nextToken.index]
+                            };
+                        } else {
+                            currentReplacement.original += token.text;
+                            currentReplacement.origIndexes.push(token.index);
+                        }
+                        i++; // 跳过下一个add操作
+                        currentReplacement.optimized += nextToken.text;
+                        currentReplacement.optIndexes.push(nextToken.index);
+                    }
+                } else if (currentReplacement !== null) {
+                    // 如果正在构建替换组，将当前删除添加到组中
+                    currentReplacement.original += token.text;
+                    currentReplacement.origIndexes.push(token.index);
+                }
+            } else if (currentReplacement !== null) {
+                // 如果是分隔符且有正在构建的替换组，完成该组
+                replacementGroups.push(currentReplacement);
+                currentReplacement = null;
+            }
+        } else if (edit.op === 'add') {
+            const token = optimizedTokens[edit.bIndex!];
+            if (!token.isDelimiter) {
+                if (currentReplacement === null) {
+                    additions.push({ text: token.text, index: token.index });
+                } else {
+                    currentReplacement.optimized += token.text;
+                    currentReplacement.optIndexes.push(token.index);
+                }
+            } else if (currentReplacement !== null) {
+                // 如果是分隔符且有正在构建的替换组，完成该组
+                replacementGroups.push(currentReplacement);
+                currentReplacement = null;
+            }
+        } else if (edit.op === 'match') {
+            if (currentReplacement !== null) {
+                // 如果有正在构建的替换组，完成该组
+                replacementGroups.push(currentReplacement);
+                currentReplacement = null;
+            }
+        }
+    }
+
+    // 处理最后一个替换组
+    if (currentReplacement !== null) {
+        replacementGroups.push(currentReplacement);
+    }
+
+    // 合并相邻的相同类型操作
+    const mergeAdjacentOperations = <T extends { text: string, index: number }>(operations: T[]): T[] => {
+        if (operations.length <= 1) return operations;
+        
+        const result: T[] = [];
+        let current = { ...operations[0] };
+        
+        for (let i = 1; i < operations.length; i++) {
+            // 如果当前操作和前一个操作的索引连续，则合并
+            if (operations[i].index === current.index + current.text.length) {
+                current.text += operations[i].text;
+            } else {
+                result.push(current);
+                current = { ...operations[i] };
+            }
+        }
+        
+        result.push(current);
+        return result;
+    };
+
+    // 合并操作
+    const mergedDeletions = mergeAdjacentOperations(deletions);
+    const mergedAdditions = mergeAdjacentOperations(additions);
+
+    // 生成变化摘要
+    let changesSummary = '';
+    
+    // 处理替换操作
+    if (replacementGroups.length > 0) {
+        const replaceItems = replacementGroups.map(r => 
+            `<span style="color: #FF8080; text-decoration: line-through;">${r.original}</span> → <span style="color: #52c41a;">${r.optimized}</span>`
+        );
+        changesSummary += replaceItems.join(', ');
+    }
+    
+    // 处理删除操作
+    if (mergedDeletions.length > 0) {
+        if (changesSummary) changesSummary += ' | ';
+        const deleteItems = mergedDeletions.map(d => 
+            `<span style="color: #FF8080; text-decoration: line-through;">${d.text}</span>`
+        );
+        changesSummary += deleteItems.join(', ');
+    }
+    
+    // 处理新增操作
+    if (mergedAdditions.length > 0) {
+        if (changesSummary) changesSummary += ' | ';
+        const addItems = mergedAdditions.map(a => 
+            `<span style="color: #52c41a;"><PlusOutlined style="fontSize: 10px"/> ${a.text}</span>`
+        );
+        changesSummary += addItems.join(', ');
+    }
+
+    return { changesSummary };
+};
 
 const SelectionOptimizationPage = () => {
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [processingStatus, setProcessingStatus] = useState('');
     const [originalItem, setOriginalItem] = useState<{ id: string, text: string } | null>(null);
-    const [optimizedItem, setOptimizedItem] = useState<{ id: string, text: string } | null>(null);
+    const [optimizedItem, setOptimizedItem] = useState<{ id: string, text: string, diff?: string[] } | null>(null);
     const [showResults, setShowResults] = useState(false);
     const [isActive, setIsActive] = useState(false);
     
@@ -112,6 +579,7 @@ const SelectionOptimizationPage = () => {
             setProgress(25);
             
             try {
+                // 第一步：进行文本优化
                 setProcessingStatus('正在优化内容...');
                 
                 const params = {
@@ -129,24 +597,116 @@ const SelectionOptimizationPage = () => {
                     signal: cancelTokenRef.current?.signal
                 };
                 
-                setProgress(50);
+                setProgress(40);
                 
-                // 发送请求
+                // 发送第一次请求
                 const response = await retryOptimization(params);
                 
-                setProgress(75);
+                if (!processingRef.current) {
+                    setLoading(false);
+                    return;
+                }
                 
-                if (processingRef.current && response.data && response.data.choices && response.data.choices.length > 0) {
-                    const result = response.data.choices[0].message.content;
+                if (response.data && response.data.choices && response.data.choices.length > 0) {
+                    const optimizedText = response.data.choices[0].message.content.trim();
                     
-                    setOptimizedItem({
-                        id: selectedText.id,
-                        text: result.trim()
-                    });
+                    // 如果优化结果和原文相同，直接返回
+                    if (optimizedText === selectedText.text.trim()) {
+                        setOptimizedItem({
+                            id: selectedText.id,
+                            text: optimizedText,
+                            diff: []
+                        });
+                        setProgress(100);
+                        setShowResults(true);
+                        message.info('文本无需优化，内容已保持原样');
+                        setLoading(false);
+                        return;
+                    }
+                    
+                    // 第二步：获取差异分析
+                    setProcessingStatus('正在分析文本差异...');
+                    setProgress(70);
+                    
+                    try {
+                        const diffResponse = await generateDiffAnalysis({
+                            original: selectedText.text,
+                            optimized: optimizedText,
+                            signal: cancelTokenRef.current?.signal
+                        });
+                        
+                        if (!processingRef.current) {
+                            setLoading(false);
+                            return;
+                        }
+                        
+                        if (diffResponse.data && diffResponse.data.choices && diffResponse.data.choices.length > 0) {
+                            const diffResult = diffResponse.data.choices[0].message.content;
+                            let diffArray: string[] = [];
+                            
+                            try {
+                                // 尝试解析JSON格式
+                                diffArray = JSON.parse(diffResult);
+                                if (!Array.isArray(diffArray)) {
+                                    // 尝试从文本中提取JSON
+                                    const jsonMatch = diffResult.match(/(\[.*\])/s);
+                                    if (jsonMatch) {
+                                        try {
+                                            diffArray = JSON.parse(jsonMatch[1]);
+                                            if (!Array.isArray(diffArray)) {
+                                                diffArray = [];
+                                            }
+                                        } catch (e) {
+                                            console.error('解析差异结果失败:', e);
+                                            diffArray = [];
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('解析差异结果失败:', e);
+                                // 尝试从文本中提取JSON
+                                const jsonMatch = diffResult.match(/(\[.*\])/s);
+                                if (jsonMatch) {
+                                    try {
+                                        diffArray = JSON.parse(jsonMatch[1]);
+                                        if (!Array.isArray(diffArray)) {
+                                            diffArray = [];
+                                        }
+                                    } catch (e2) {
+                                        console.error('再次解析差异结果失败:', e2);
+                                        diffArray = [];
+                                    }
+                                }
+                            }
+                            
+                            setOptimizedItem({
+                                id: selectedText.id,
+                                text: optimizedText,
+                                diff: diffArray
+                            });
+                        } else {
+                            // 没有差异分析结果
+                            setOptimizedItem({
+                                id: selectedText.id,
+                                text: optimizedText,
+                                diff: []
+                            });
+                        }
+                    } catch (error: any) {
+                        // 差异分析失败，仍然返回优化结果
+                        console.error('差异分析失败:', error);
+                        setOptimizedItem({
+                            id: selectedText.id,
+                            text: optimizedText,
+                            diff: []
+                        });
+                    }
                     
                     setProgress(100);
                     setShowResults(true);
                     message.success('内容优化完成！');
+                } else {
+                    message.error('获取优化结果失败');
                 }
             } catch (error: any) {
                 if (error.name === 'AbortError') {
@@ -232,6 +792,36 @@ const SelectionOptimizationPage = () => {
         }
     };
     
+    // 添加renderDiffChanges函数，用于展示deepseek返回的diff数据
+    const renderDiffChanges = (diffArray?: string[]) => {
+        if (!diffArray || diffArray.length === 0) {
+            return { changesSummary: '' };
+        }
+        
+        // 将diff数组转换为HTML
+        const changesSummary = diffArray.map(diff => {
+            // 处理替换模式: "A → B"
+            if (diff.includes('→')) {
+                const [original, optimized] = diff.split('→').map(s => s.trim());
+                return `<span style="color: #FF8080; text-decoration: line-through;">${original}</span> → <span style="color: #52c41a;">${optimized}</span>`;
+            }
+            // 处理删除模式: "-A" 或 "删除A"
+            else if (diff.startsWith('-') || diff.includes('删除')) {
+                const deletedText = diff.startsWith('-') ? diff.substring(1).trim() : diff.replace(/删除/g, '').trim();
+                return `<span style="color: #FF8080; text-decoration: line-through;">${deletedText}</span>`;
+            }
+            // 处理添加模式: "+A" 或 "添加A"
+            else if (diff.startsWith('+') || diff.includes('添加')) {
+                const addedText = diff.startsWith('+') ? diff.substring(1).trim() : diff.replace(/添加/g, '').trim();
+                return `<span style="color: #52c41a;">+${addedText}</span>`;
+            }
+            // 其他情况直接显示
+            return `<span>${diff}</span>`;
+        }).join(', ');
+        
+        return { changesSummary };
+    };
+    
     const renderComparisonCard = () => {
         if (!showResults || !originalItem || !optimizedItem) return null;
         
@@ -257,6 +847,11 @@ const SelectionOptimizationPage = () => {
                 </div>
             );
         }
+        
+        // 获取变化摘要，优先使用deepseek返回的diff数据
+        const { changesSummary } = optimizedItem.diff 
+            ? renderDiffChanges(optimizedItem.diff) 
+            : highlightTextDifferences(originalItem.text, optimizedItem.text);
         
         // 定义卡片宽度
         const cardWidth = 500;
@@ -288,6 +883,19 @@ const SelectionOptimizationPage = () => {
                     onClick={handleLocateInDocument}
                 >
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        {changesSummary && (
+                            <div 
+                                style={{
+                                    fontSize: '12px',
+                                    marginBottom: '8px',
+                                    padding: '6px',
+                                    borderRadius: '4px',
+                                    background: '#f9f9f9',
+                                    borderLeft: '2px solid #1890ff'
+                                }}
+                                dangerouslySetInnerHTML={{ __html: changesSummary }}
+                            />
+                        )}
                         <div style={{ 
                             display: 'flex', 
                             justifyContent: 'space-between', 

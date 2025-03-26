@@ -8,7 +8,7 @@ const router = createBrowserRouter([
     {
         path: '/',
         element: <App />,
-        errorElement: <ErrorHandler />,
+       // errorElement: <ErrorHandler />,
         children: [
             {
                 path: 'dialog',

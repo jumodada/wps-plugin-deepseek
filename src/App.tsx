@@ -8,6 +8,7 @@ import theme from './theme';
 export default function App() {
   useEffect(() => {
     window.ribbon = ribbon;
+    window._Application = window.Application;
   }, []);
   return (
     <ConfigProvider theme={theme} locale={zhCN}>
