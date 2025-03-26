@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button, message, Progress, Card, Space, Tooltip } from 'antd';
-import { StopOutlined, SyncOutlined, AimOutlined, PlusOutlined } from '@ant-design/icons';
+import { StopOutlined, SyncOutlined, AimOutlined } from '@ant-design/icons';
 import { 
     isWordDocument,
     extractSelectedText,
@@ -8,7 +8,7 @@ import {
     locateParagraphInDocument,
     injectOptimizationStyles
 } from '../tool/optimization';
-import { submitOptimization, generateDiffAnalysis } from '../api/deepseek';
+import { generateDiffAnalysis } from '../api/deepseek';
 import { usePageReset } from '../hooks';
 
 // 添加优化的差异检测函数
@@ -871,18 +871,27 @@ const SelectionOptimizationPage = () => {
                         borderWidth: isActive ? '2px' : '1px',
                         borderColor: isActive ? '#1890ff' : '',
                         animation: 'fadeInUp 0.5s ease',
-                        borderLeft: '3px solid #1890ff'
+                        borderLeft: '3px solid #1890ff',
+                        overflow: 'hidden'
                     }}
                     bodyStyle={{
                         padding: '16px',
                         display: 'flex',
                         flexDirection: 'column',
-                        background: isActive ? '#f0f8ff' : ''
+                        background: isActive ? '#f0f8ff' : '',
+                        width: '100%',
+                        overflow: 'hidden'
                     }}
                     hoverable
                     onClick={handleLocateInDocument}
                 >
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ 
+                        flex: 1, 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        width: '100%',
+                        overflow: 'hidden'
+                    }}>
                         {changesSummary && (
                             <div 
                                 style={{
@@ -891,47 +900,92 @@ const SelectionOptimizationPage = () => {
                                     padding: '6px',
                                     borderRadius: '4px',
                                     background: '#f9f9f9',
-                                    borderLeft: '2px solid #1890ff'
+                                    borderLeft: '2px solid #1890ff',
+                                    width: '100%',
+                                    overflow: 'hidden'
                                 }}
-                                dangerouslySetInnerHTML={{ __html: changesSummary }}
-                            />
+                            >
+                                <div 
+                                    style={{
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: changesSummary }}
+                                />
+                            </div>
                         )}
                         <div style={{ 
                             display: 'flex', 
                             justifyContent: 'space-between', 
                             alignItems: 'center',
-                            marginBottom: '12px' 
+                            marginBottom: '12px',
+                            width: '100%'
                         }}>
                             <h4 style={{ margin: 0 }}>原始内容:</h4>
                             <Tooltip title="定位到文档">
                                 <AimOutlined style={{ color: isActive ? '#1890ff' : '#52c41a' }} />
                             </Tooltip>
                         </div>
-                        <Tooltip title={originalItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
+                        <Tooltip 
+                            title={originalItem.text} 
+                            placement="topLeft" 
+                            color="#fff" 
+                            overlayInnerStyle={{ color: '#333', maxWidth: '400px', maxHeight: '300px', overflow: 'auto' }}
+                            mouseEnterDelay={0.5}
+                        >
                             <div style={{ 
                                 maxHeight: '150px', 
-                                overflow: 'auto',
+                                overflow: 'hidden',
                                 marginBottom: '16px',
                                 padding: '12px',
                                 background: '#f9f9f9',
-                                borderRadius: '4px'
+                                borderRadius: '4px',
+                                width: '100%'
                             }}>
-                                {originalItem.text}
+                                <div style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 4,
+                                    WebkitBoxOrient: 'vertical',
+                                    wordBreak: 'break-word',
+                                    wordWrap: 'break-word'
+                                }}>
+                                    {originalItem.text}
+                                </div>
                             </div>
                         </Tooltip>
                         
                         <h4>优化后内容:</h4>
-                        <Tooltip title={optimizedItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
+                        <Tooltip 
+                            title={optimizedItem.text} 
+                            placement="topLeft" 
+                            color="#fff" 
+                            overlayInnerStyle={{ color: '#333', maxWidth: '400px', maxHeight: '300px', overflow: 'auto' }}
+                            mouseEnterDelay={0.5}
+                        >
                             <div style={{ 
                                 maxHeight: '150px', 
-                                overflow: 'auto',
+                                overflow: 'hidden',
                                 color: '#1890ff', 
                                 padding: '12px',
                                 background: '#f0f8ff',
                                 borderRadius: '4px',
-                                marginBottom: '16px'
+                                marginBottom: '16px',
+                                width: '100%'
                             }}>
-                                {optimizedItem.text}
+                                <div style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 4,
+                                    WebkitBoxOrient: 'vertical',
+                                    wordBreak: 'break-word',
+                                    wordWrap: 'break-word'
+                                }}>
+                                    {optimizedItem.text}
+                                </div>
                             </div>
                         </Tooltip>
                         
