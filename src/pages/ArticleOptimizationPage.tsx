@@ -6,7 +6,7 @@ import { usePageReset } from '../hooks';
 
 const extractParagraphsFromDocument = (): { id: string, text: string }[] => {
     const result: { id: string, text: string }[] = [];
-    const document = window._Application.ActiveDocument;
+    const document = window._Application?.ActiveDocument;
     const paragraphCount = document.Paragraphs.Count;
 
     for (let i = 1; i <= paragraphCount; i++) {
@@ -25,7 +25,7 @@ const extractParagraphsFromDocument = (): { id: string, text: string }[] => {
 };
 
 const isWordDocument = (): boolean => {
-    return !!window._Application.ActiveDocument;
+    return !!window._Application?.ActiveDocument;
 };
 
 const retryOptimization = async (params: any, maxRetries: number = 3): Promise<any> => {
@@ -85,9 +85,9 @@ const ArticleOptimizationPage = () => {
     const restoreOriginalStyle = (paragraphId: string) => {
         const originalStyle = originalStylesMap.current.get(paragraphId);
         if (originalStyle) {
-            const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+            const paragraphCount = window._Application.ActiveDocument?.Paragraphs.Count;
             for (let i = 1; i <= paragraphCount; i++) {
-                const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
+                const paragraph = window._Application.ActiveDocument?.Paragraphs.Item(i);
                 if (paragraph.ParaID === paragraphId) {
                     const underline = originalStyle.underline === 9999999 ? 0 : originalStyle.underline;
                     const color = originalStyle.color === 9999999 ? 0 : originalStyle.color;
@@ -149,7 +149,6 @@ const ArticleOptimizationPage = () => {
         setLoading(true);
 
         if (!isWordDocument()) {
-            message.warning('无法访问Word文档，请确保文档已打开');
             setLoading(false);
             return;
         }
@@ -347,11 +346,11 @@ const ArticleOptimizationPage = () => {
         }
         setActiveCardId(null);
         
-        const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+        const paragraphCount = window._Application.ActiveDocument?.Paragraphs.Count;
         let replaced = false;
 
         for (let i = 1; i <= paragraphCount; i++) {
-            const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
+            const paragraph = window._Application.ActiveDocument?.Paragraphs.Item(i);
             if (paragraph.ParaID === originalItem.id) {
                 const originalStyle = {...paragraph.Style};
                 const originalFont = {...paragraph.Style.Font};
@@ -408,11 +407,11 @@ const ArticleOptimizationPage = () => {
             return;
         }
         
-        const paragraphCount = window._Application.ActiveDocument.Paragraphs.Count;
+        const paragraphCount = window._Application.ActiveDocument?.Paragraphs.Count;
         let found = false;
 
         for (let i = 1; i <= paragraphCount; i++) {
-            const paragraph = window._Application.ActiveDocument.Paragraphs.Item(i);
+            const paragraph = window._Application.ActiveDocument?.Paragraphs.Item(i);
             if (paragraph.ParaID === paragraphId) {
                 paragraph.Range.Select();
                 found = true;
@@ -587,18 +586,27 @@ const ArticleOptimizationPage = () => {
                                                 boxShadow: isActive ? '0 0 10px rgba(24, 144, 255, 0.8)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
                                                 borderWidth: isActive ? '2px' : '1px',
                                                 borderColor: isActive ? '#1890ff' : '',
-                                                borderLeft: '3px solid #1890ff'
+                                                borderLeft: '3px solid #1890ff',
+                                                overflow: 'hidden'
                                             }}
                                             bodyStyle={{
                                                 padding: '12px',
                                                 display: 'flex',
                                                 flexDirection: 'column',
-                                                background: isActive ? '#f0f8ff' : ''
+                                                background: isActive ? '#f0f8ff' : '',
+                                                width: '100%',
+                                                overflow: 'hidden'
                                             }}
                                             hoverable
                                             onClick={() => handleLocateInDocument(item.id)}
                                         >
-                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                            <div style={{ 
+                                                flex: 1, 
+                                                display: 'flex', 
+                                                flexDirection: 'column',
+                                                width: '100%',
+                                                overflow: 'hidden'
+                                            }}>
                                                 {diffDisplay && (
                                                     <div 
                                                         style={{
@@ -607,25 +615,53 @@ const ArticleOptimizationPage = () => {
                                                             padding: '6px',
                                                             borderRadius: '4px',
                                                             background: '#f9f9f9',
-                                                            borderLeft: '2px solid #1890ff'
+                                                            borderLeft: '2px solid #1890ff',
+                                                            width: '100%',
+                                                            overflow: 'hidden'
                                                         }}
-                                                        dangerouslySetInnerHTML={{ __html: diffDisplay }}
-                                                    />
+                                                    >
+                                                        <div 
+                                                            style={{
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap'
+                                                            }}
+                                                            dangerouslySetInnerHTML={{ __html: diffDisplay }}
+                                                        />
+                                                    </div>
                                                 )}
-                                                <Tooltip title={optimizedItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
+                                                <Tooltip 
+                                                    title={optimizedItem.text} 
+                                                    placement="topLeft" 
+                                                    color="#fff" 
+                                                    overlayInnerStyle={{ color: '#333', maxWidth: '400px', maxHeight: '300px', overflow: 'auto' }}
+                                                    mouseEnterDelay={0.5}
+                                                >
                                                     <div
                                                         style={{
                                                             maxHeight: '200px',
-                                                            overflow: 'auto',
+                                                            overflow: 'hidden',
                                                             color: replacedItems.has(item.id) ? '#999' : '#bbc6ce',
                                                             padding: '8px',
                                                             background: '#f0f8ff',
                                                             borderRadius: '4px',
                                                             marginBottom: '16px',
-                                                            textDecoration: replacedItems.has(item.id) ? 'line-through' : 'none'
+                                                            textDecoration: replacedItems.has(item.id) ? 'line-through' : 'none',
+                                                            width: '100%',
+                                                            maxWidth: '400px'
                                                         }}
                                                     >
-                                                        {optimizedItem.text}
+                                                        <div style={{
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            display: '-webkit-box',
+                                                            WebkitLineClamp: 5,
+                                                            WebkitBoxOrient: 'vertical',
+                                                            wordBreak: 'break-word',
+                                                            wordWrap: 'break-word'
+                                                        }}>
+                                                            {optimizedItem.text}
+                                                        </div>
                                                     </div>
                                                 </Tooltip>
 
@@ -699,7 +735,7 @@ const ArticleOptimizationPage = () => {
     useEffect(() => {
         const checkDocumentName = () => {
             if (isWordDocument()) {
-                const currentDocName = window._Application.ActiveDocument.Name;
+                const currentDocName = window._Application.ActiveDocument?.Name;
                 if (activeDocumentName !== currentDocName) {
                     setActiveDocumentName(currentDocName);
                     if (activeDocumentName !== null) { // 不是首次设置才重新处理
@@ -711,7 +747,7 @@ const ArticleOptimizationPage = () => {
 
         // 初始设置文档名
         if (isWordDocument()) {
-            setActiveDocumentName(window._Application.ActiveDocument.Name);
+            setActiveDocumentName(window._Application.ActiveDocument?.Name);
         }
 
         // 设置定时检查
