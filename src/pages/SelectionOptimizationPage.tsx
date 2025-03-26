@@ -238,7 +238,7 @@ const SelectionOptimizationPage = () => {
         if (originalItem.text.trim() === optimizedItem.text.trim()) {
             return (
                 <div style={{ marginTop: '20px', width: '100%', textAlign: 'center' }}>
-                    <Card style={{ maxWidth: '500px', margin: '0 auto' }}>
+                    <Card style={{ maxWidth: '500px', margin: '0 auto', borderLeft: '3px solid #1890ff' }}>
                         <div style={{ padding: '20px', textAlign: 'center' }}>
                             <p>优化内容与原内容相同，无需替换</p>
                             <Button 
@@ -263,7 +263,7 @@ const SelectionOptimizationPage = () => {
         
         return (
             <div style={{ marginTop: '20px', width: '100%', textAlign: 'center' }}>
-                <h2 style={{ color: 'white', textAlign: 'center', marginBottom: '20px' }}>优化结果对比</h2>
+                <h2 style={{ color: '#333', textAlign: 'center', marginBottom: '20px' }}>优化结果对比</h2>
                 <Card 
                     ref={cardRef}
                     bordered={true}
@@ -275,7 +275,8 @@ const SelectionOptimizationPage = () => {
                         boxShadow: isActive ? '0 0 10px rgba(24, 144, 255, 0.8)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
                         borderWidth: isActive ? '2px' : '1px',
                         borderColor: isActive ? '#1890ff' : '',
-                        animation: 'fadeInUp 0.5s ease'
+                        animation: 'fadeInUp 0.5s ease',
+                        borderLeft: '3px solid #1890ff'
                     }}
                     bodyStyle={{
                         padding: '16px',
@@ -326,7 +327,7 @@ const SelectionOptimizationPage = () => {
                             </div>
                         </Tooltip>
                         
-                        <div style={{ textAlign: 'center', marginTop: 'auto' }}>
+                        <div style={{ textAlign: 'left', marginTop: 'auto' }}>
                             <Space>
                                 <Button 
                                     type="primary" 
@@ -357,10 +358,10 @@ const SelectionOptimizationPage = () => {
     };
 
     return (
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'white' }}>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#f0f2f5', color: '#333' }}>
             {loading ? (
-                <div style={{ width: '80%', maxWidth: '500px', textAlign: 'center', color: 'white' }}>
-                    {processingStatus && <p style={{ marginBottom: '20px', color: 'white' }}>{processingStatus}</p>}
+                <div style={{ width: '80%', maxWidth: '500px', textAlign: 'center', color: '#333' }}>
+                    {processingStatus && <p style={{ marginBottom: '20px', color: '#333' }}>{processingStatus}</p>}
                     <Progress 
                         type="circle"
                         percent={progress} 
@@ -370,8 +371,8 @@ const SelectionOptimizationPage = () => {
                             '0%': '#108ee9',
                             '100%': '#87d068',
                         }}
-                        trailColor="rgba(255,255,255,0.2)"
-                        format={percent => <span style={{ color: 'white' }}>{percent}%</span>}
+                        trailColor="rgba(0,0,0,0.1)"
+                        format={percent => <span style={{ color: '#333' }}>{percent}%</span>}
                     />
                     <Button 
                         danger

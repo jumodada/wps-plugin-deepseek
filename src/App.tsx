@@ -11,8 +11,9 @@ export default function App() {
   }, []);
   return (
     <ConfigProvider theme={theme} locale={zhCN}>
-      <Outlet />
+      <div style={{ width: '100vw', height: '100%', backgroundColor: '#f0f2f5'  }}>
+        <Outlet />
+      </div>
     </ConfigProvider>
   );
 }
-  

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Button, message, Progress, Card, Row, Col, Space, Tooltip, Spin } from 'antd';
-import { StopOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { message, Card, Row, Col, Space, Tooltip, Spin, Collapse } from 'antd';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { submitOptimization } from '../api/deepseek';
 import { usePageReset } from '../hooks';
 
@@ -48,7 +48,6 @@ const retryOptimization = async (params: any, maxRetries: number = 3): Promise<a
 
 const ArticleOptimizationPage = () => {
     const [loading, setLoading] = useState(false);
-    const [progress, setProgress] = useState(0);
     const [processingStatus, setProcessingStatus] = useState('');
     const [originalData, setOriginalData] = useState<{ id: string, text: string }[]>([]);
     const [optimizedData, setOptimizedData] = useState<{ 
@@ -62,7 +61,6 @@ const ArticleOptimizationPage = () => {
 
     const handleReset = () => {
         setLoading(false);
-        setProgress(0);
         setProcessingStatus('');
         setOriginalData([]);
         setOptimizedData([]);
@@ -70,7 +68,7 @@ const ArticleOptimizationPage = () => {
         setReplacedItems(new Set());
         setActiveCardId(null);
         restoreAllOriginalStyles();
-        message.info('文档已切换，页面已重置');
+        handleStartProcess();
     };
     
     usePageReset(handleReset);
@@ -91,7 +89,6 @@ const ArticleOptimizationPage = () => {
                 if (paragraph.ParaID === paragraphId) {
                     const underline = originalStyle.underline === 9999999 ? 0 : originalStyle.underline;
                     const color = originalStyle.color === 9999999 ? 0 : originalStyle.color;
-                    
                     paragraph.Range.Font.Underline = underline;
                     paragraph.Range.Font.Color = color;
                     break;
@@ -106,23 +103,12 @@ const ArticleOptimizationPage = () => {
         });
     };
 
-    const handleCancel = () => {
-        if (cancelTokenRef.current) {
-            cancelTokenRef.current.abort();
-            cancelTokenRef.current = null;
-        }
-        processingRef.current = false;
-        setLoading(false);
-        setProcessingStatus('');
-        setProgress(0);
-    };
 
     const handleStartProcess = async () => {
         cancelTokenRef.current = new AbortController();
         processingRef.current = true;
 
         setLoading(true);
-        setProgress(0);
 
         if (!isWordDocument()) {
             message.warning('无法访问Word文档，请确保文档已打开');
@@ -160,8 +146,6 @@ const ArticleOptimizationPage = () => {
             signal: cancelTokenRef.current?.signal
         };
 
-        setProgress(20);
-
         const response = await retryOptimization(params);
 
         if (processingRef.current && response.data && response.data.choices && response.data.choices.length > 0) {
@@ -178,7 +162,6 @@ const ArticleOptimizationPage = () => {
                     text: item.text.replace(/\r$/, '')
                 }));
                 setOptimizedData(processedData);
-                setProgress(100);
             } else {
                 const resultBlocks = result.split(/\n\s*\n/);
                 const parsedData: { id: string, text: string, notImprove?: boolean }[] = [];
@@ -202,7 +185,6 @@ const ArticleOptimizationPage = () => {
 
                 if (parsedData.length > 0) {
                     setOptimizedData(parsedData);
-                    setProgress(100);
                 } else {
                     setOptimizedData(structuredData.map(item => ({ ...item, notImprove: true })));
                     message.warning('无法解析优化结果，将显示原始内容');
@@ -210,7 +192,11 @@ const ArticleOptimizationPage = () => {
             }
 
             setShowResults(true);
+            setLoading(false);
             message.success('处理完成！请查看优化结果并选择是否替换。');
+        } else {
+            setLoading(false);
+            message.error('处理失败，请重试');
         }
     };
 
@@ -435,7 +421,7 @@ const ArticleOptimizationPage = () => {
         if (filteredData.length === 0) {
             return (
                 <div style={{ marginTop: '20px', width: '100%', textAlign: 'center' }}>
-                    <Card style={{ maxWidth: '500px', margin: '0 auto' }}>
+                    <Card style={{ maxWidth: '500px', margin: '0 auto', borderLeft: '3px solid #1890ff' }}>
                         <div style={{ padding: '20px', textAlign: 'center' }}>
                             <p>{replacedItems.size > 0 ? '所有内容已成功替换' : '没有需要优化的内容或优化内容与原内容相同'}</p>
                             <span
@@ -463,103 +449,117 @@ const ArticleOptimizationPage = () => {
         }
 
         return (
-            <div style={{ marginTop: '20px', width: '100%' }}>
-                <Row gutter={[16, 16]} justify="center">
-                    {filteredData.map((item, index) => {
-                        const optimizedItem = optimizedData.find(opt => opt.id === item.id);
-                        if (!optimizedItem || optimizedItem.notImprove) return null;
+            <div style={{ marginTop: '20px', width: '100%', height: '100vh' }}>
+                <Collapse
+                    ghost
+                    defaultActiveKey={['1']} 
+                    style={{ backgroundColor: '#f0f2f5', marginBottom: '20px' }}
+                    expandIconPosition="end"
+                >
+                    <Collapse.Panel 
+                        key="1" 
+                        header={`全部 (${filteredData.length})`}
+                        style={{ textAlign: 'start' }}
+                    >
+                        <Row gutter={[5, 5]} justify="start">
+                            {filteredData.map((item, index) => {
+                                const optimizedItem = optimizedData.find(opt => opt.id === item.id);
+                                if (!optimizedItem || optimizedItem.notImprove) return null;
 
-                        const highlightedText = highlightTextChanges(item.text, optimizedItem.text);
-                        const isActive = activeCardId === item.id;
+                                const highlightedText = highlightTextChanges(item.text, optimizedItem.text);
+                                const isActive = activeCardId === item.id;
 
-                        return (
-                            <Col xs={24} sm={12} md={8} key={item.id} style={{
-                                marginBottom: '16px',
-                                display: 'flex',
-                                justifyContent: 'center'
-                            }}>
-                                <Card
-                                    ref={el => cardRefs.current[item.id] = el}
-                                    bordered={true}
-                                    style={{
-                                        width: cardWidth,
-                                        cursor: 'pointer',
-                                        transition: 'all 0.3s',
-                                        boxShadow: isActive ? '0 0 10px rgba(24, 144, 255, 0.8)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
-                                        borderWidth: isActive ? '2px' : '1px',
-                                        borderColor: isActive ? '#1890ff' : '',
-                                    }}
-                                    bodyStyle={{
-                                        padding: '12px',
+                                return (
+                                    <Col xs={24} sm={12} md={8} key={item.id} style={{
+                                        marginBottom: '8px',
                                         display: 'flex',
-                                        flexDirection: 'column',
-                                        background: isActive ? '#f0f8ff' : ''
-                                    }}
-                                    hoverable
-                                    onClick={() => handleLocateInDocument(item.id)}
-                                >
-                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                        <Tooltip title={optimizedItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
-                                            <div
-                                                style={{
-                                                    maxHeight: '200px',
-                                                    overflow: 'auto',
-                                                    color: replacedItems.has(item.id) ? '#999' : '#bbc6ce',
-                                                    padding: '8px',
-                                                    background: '#f0f8ff',
-                                                    borderRadius: '4px',
-                                                    marginBottom: '16px',
-                                                    textDecoration: replacedItems.has(item.id) ? 'line-through' : 'none'
-                                                }}
-                                                dangerouslySetInnerHTML={{ __html: highlightedText }}
-                                            />
-                                        </Tooltip>
+                                        justifyContent: 'center'
+                                    }}>
+                                        <Card
+                                            ref={el => cardRefs.current[item.id] = el}
+                                            bordered={true}
+                                            style={{
+                                                width: cardWidth,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s',
+                                                boxShadow: isActive ? '0 0 10px rgba(24, 144, 255, 0.8)' : '0 2px 8px rgba(0, 0, 0, 0.15)',
+                                                borderWidth: isActive ? '2px' : '1px',
+                                                borderColor: isActive ? '#1890ff' : '',
+                                                borderLeft: '3px solid #1890ff'
+                                            }}
+                                            bodyStyle={{
+                                                padding: '12px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                background: isActive ? '#f0f8ff' : ''
+                                            }}
+                                            hoverable
+                                            onClick={() => handleLocateInDocument(item.id)}
+                                        >
+                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                                <Tooltip title={optimizedItem.text} placement="topLeft" color="#fff" overlayInnerStyle={{ color: '#333' }}>
+                                                    <div
+                                                        style={{
+                                                            maxHeight: '200px',
+                                                            overflow: 'auto',
+                                                            color: replacedItems.has(item.id) ? '#999' : '#bbc6ce',
+                                                            padding: '8px',
+                                                            background: '#f0f8ff',
+                                                            borderRadius: '4px',
+                                                            marginBottom: '16px',
+                                                            textDecoration: replacedItems.has(item.id) ? 'line-through' : 'none'
+                                                        }}
+                                                        dangerouslySetInnerHTML={{ __html: highlightedText }}
+                                                    />
+                                                </Tooltip>
 
-                                        <div style={{ textAlign: 'center', marginTop: 'auto', display: 'flex', justifyContent: 'center', gap: '15px' }}>
-                                            <span
-                                                style={{ 
-                                                    cursor: 'pointer', 
-                                                    color: '#1890ff',
-                                                    fontSize: '13px'
-                                                }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleReplaceItem(item, optimizedItem);
-                                                }}
-                                            >
-                                                <CheckOutlined style={{ marginRight: '3px' }} />
-                                                替换
-                                            </span>
-                                            <span
-                                                style={{ 
-                                                    cursor: 'pointer', 
-                                                    color: '#999',
-                                                    fontSize: '13px'
-                                                }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (activeCardId === item.id) {
-                                                        restoreOriginalStyle(item.id);
-                                                        setActiveCardId(null);
-                                                        originalStylesMap.current.delete(item.id);
-                                                    }
-                                                    setReplacedItems(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.add(item.id);
-                                                        return newSet;
-                                                    });
-                                                }}
-                                            >
-                                                <CloseOutlined style={{ marginRight: '3px' }} />
-                                                忽略
-                                            </span>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </Col>
-                        );
-                    })}
-                </Row>
+                                                <div style={{ textAlign: 'left', marginTop: 'auto', display: 'flex', justifyContent: 'flex-start', gap: '15px' }}>
+                                                    <span
+                                                        style={{ 
+                                                            cursor: 'pointer', 
+                                                            color: '#1890ff',
+                                                            fontSize: '13px'
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleReplaceItem(item, optimizedItem);
+                                                        }}
+                                                    >
+                                                        <CheckOutlined style={{ marginRight: '3px' }} />
+                                                        替换
+                                                    </span>
+                                                    <span
+                                                        style={{ 
+                                                            cursor: 'pointer', 
+                                                            color: '#999',
+                                                            fontSize: '13px'
+                                                        }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (activeCardId === item.id) {
+                                                                restoreOriginalStyle(item.id);
+                                                                setActiveCardId(null);
+                                                                originalStylesMap.current.delete(item.id);
+                                                            }
+                                                            setReplacedItems(prev => {
+                                                                const newSet = new Set(prev);
+                                                                newSet.add(item.id);
+                                                                return newSet;
+                                                            });
+                                                        }}
+                                                    >
+                                                        <CloseOutlined style={{ marginRight: '3px' }} />
+                                                        忽略
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    </Col>
+                                );
+                            })}
+                        </Row>
+                    </Collapse.Panel>
+                </Collapse>
 
                 {renderActionButtons()}
             </div>
@@ -574,23 +574,17 @@ const ArticleOptimizationPage = () => {
     }, [activeCardId]);
 
     useEffect(() => {
+        if(optimizedData.length === 0 && !loading) {
         handleStartProcess();
+        }
     }, []);
 
     return (
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'white' }}>
+        <div style={{ padding: '5px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#f0f2f5', color: '#333' }}>
             {loading ? (
-                <div style={{ width: '80%', maxWidth: '500px', textAlign: 'center', color: 'white' }}>
-                    {processingStatus && <p style={{ marginBottom: '20px', color: 'white' }}>{processingStatus}</p>}
+                <div style={{ width: '100%', maxWidth: '500px', textAlign: 'center', color: '#333' }}>
+                    {processingStatus && <p style={{ marginBottom: '20px', color: '#333' }}>{processingStatus}</p>}
                     <Spin size="large" />
-                    <Button
-                        danger
-                        icon={<StopOutlined />}
-                        onClick={handleCancel}
-                        style={{ marginTop: '20px' }}
-                    >
-                        取消操作
-                    </Button>
                 </div>
             ) : showResults ? (
                 renderComparisonCards()
