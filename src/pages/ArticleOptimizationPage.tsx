@@ -411,6 +411,8 @@ const ArticleOptimizationPage = () => {
                 paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
                 paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
                 replaced = true;
+                window._Application.ActiveDocument.Sync.PutUpdate();
+                paragraph.Range.Find.Execute();
                 break;
             }
         }
