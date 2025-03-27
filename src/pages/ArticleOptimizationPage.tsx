@@ -162,6 +162,33 @@ const ArticleOptimizationPage = () => {
             return;
         }
 
+        // 检查是否有缓存数据
+        const cacheKey = `optimization_cache_${window._Application.ActiveDocument?.Name}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        
+        if (cachedData) {
+            try {
+                const parsedCache = JSON.parse(cachedData);
+                // 检查缓存数据是否与当前文档内容匹配
+                if (parsedCache.originalData && 
+                    parsedCache.originalData.length === structuredData.length &&
+                    parsedCache.originalData.every((item: any, index: number) => 
+                        item.id === structuredData[index].id && 
+                        item.text === structuredData[index].text
+                    )) {
+                    setOriginalData(parsedCache.originalData);
+                    setOptimizedData(parsedCache.optimizedData);
+                    setShowResults(true);
+                    setLoading(false);
+                    message.success('使用缓存数据');
+                    return;
+                }
+            } catch (error) {
+                console.error('解析缓存数据失败:', error);
+                localStorage.removeItem(cacheKey);
+            }
+        }
+
         setOriginalData(structuredData);
         setProcessingStatus(`正在处理文档内容...`);
 
@@ -225,7 +252,8 @@ const ArticleOptimizationPage = () => {
                     
                     // 如果没有有效项目，使用原始内容
                     if (optimizedItems.length === 0) {
-                        setOptimizedData(structuredData.map(item => ({ ...item, notImprove: true })));
+                        const finalData = structuredData.map(item => ({ ...item, notImprove: true }));
+                        setOptimizedData(finalData);
                         message.warning('没有可优化的内容');
                         setShowResults(true);
                         setLoading(false);
@@ -318,6 +346,17 @@ const ArticleOptimizationPage = () => {
                     setOptimizedData(itemsWithDiff);
                     setShowResults(true);
                     setLoading(false);
+                    
+                    // 保存到 localStorage
+                    try {
+                        localStorage.setItem(cacheKey, JSON.stringify({
+                            originalData: structuredData,
+                            optimizedData: itemsWithDiff
+                        }));
+                    } catch (error) {
+                        console.error('保存缓存数据失败:', error);
+                    }
+                    
                     message.success('处理完成！请查看优化结果并选择是否替换。');
                 } catch (error) {
                     console.error('解析结果失败:', error);
@@ -357,7 +396,6 @@ const ArticleOptimizationPage = () => {
                 window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Paste();
                 const originalStyle = {...paragraph.Style};
                 const originalFont = {...paragraph.Style.Font};
-                const originalParagraphFormat = {...paragraph.Range.ParagraphFormat};
                 const CharacterUnitFirstLineIndent = paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent;
                 const CharacterUnitLeftIndent = paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent;
                 const firstLineIndent = paragraph.Range.ParagraphFormat.FirstLineIndent;
@@ -367,13 +405,11 @@ const ArticleOptimizationPage = () => {
                 }
                 paragraph.Range.Text = newText;
                 window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Delete();
-                // paragraph.Range.Text = newText;
-                // paragraph.Style = originalStyle;
-                // paragraph.Style.Font = originalFont;
-                // paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
-                // paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
-                // paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
-                // paragraph.Range.ParagraphFormat = originalParagraphFormat;
+                paragraph.Style = originalStyle;
+                paragraph.Style.Font = originalFont;
+                paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
+                paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
+                paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
                 replaced = true;
                 break;
             }
