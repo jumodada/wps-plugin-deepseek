@@ -352,6 +352,9 @@ const ArticleOptimizationPage = () => {
         for (let i = 1; i <= paragraphCount; i++) {
             const paragraph = window._Application.ActiveDocument?.Paragraphs.Item(i);
             if (paragraph.ParaID === originalItem.id) {
+                paragraph.Range.Copy();
+                paragraph.Range.InsertParagraphAfter();
+                window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Paste();
                 const originalStyle = {...paragraph.Style};
                 const originalFont = {...paragraph.Style.Font};
                 const originalParagraphFormat = {...paragraph.Range.ParagraphFormat};
@@ -363,12 +366,14 @@ const ArticleOptimizationPage = () => {
                     newText = newText + '\r';
                 }
                 paragraph.Range.Text = newText;
-                paragraph.Style = originalStyle;
-                paragraph.Style.Font = originalFont;
-                paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
-                paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
-                paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
-                paragraph.Range.ParagraphFormat = originalParagraphFormat;
+                window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Delete();
+                // paragraph.Range.Text = newText;
+                // paragraph.Style = originalStyle;
+                // paragraph.Style.Font = originalFont;
+                // paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
+                // paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
+                // paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
+                // paragraph.Range.ParagraphFormat = originalParagraphFormat;
                 replaced = true;
                 break;
             }
