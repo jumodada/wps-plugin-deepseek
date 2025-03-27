@@ -4,6 +4,25 @@ import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { submitOptimization, generateDiffAnalysis } from '../api/deepseek';
 import { usePageReset } from '../hooks';
 
+// 处理文档中的图片换行问题
+const handleImageLineBreak = (): void => {
+    try {
+        const ActiveDocument = window._Application?.ActiveDocument;
+        if (!ActiveDocument) return;
+        
+        const pcount = ActiveDocument.InlineShapes;
+        
+        for (var i = 1; i <= pcount.Count; i = i + 1) {
+            var pc = pcount.Item(i);
+            pc.Range.InsertBefore("\n");
+        }
+        
+        ActiveDocument.Sync.PutUpdate();
+    } catch (error) {
+        console.error('处理图片换行失败:', error);
+    }
+};
+
 const extractParagraphsFromDocument = (): { id: string, text: string }[] => {
     const result: { id: string, text: string }[] = [];
     const document = window._Application?.ActiveDocument;
@@ -54,7 +73,8 @@ const ArticleOptimizationPage = () => {
         id: string, 
         text: string, 
         diff?: string[],
-        notImprove?: boolean 
+        notImprove?: boolean,
+        replaced?: boolean
     }[]>([]);
     const [showResults, setShowResults] = useState(false);
     const [replacedItems, setReplacedItems] = useState<Set<string>>(new Set());
@@ -153,6 +173,10 @@ const ArticleOptimizationPage = () => {
             return;
         }
 
+        setProcessingStatus('正在处理文档中的图片...');
+        // 先处理图片换行问题
+        handleImageLineBreak();
+
         setProcessingStatus('正在提取文档段落内容...');
         const structuredData = extractParagraphsFromDocument();
 
@@ -165,7 +189,6 @@ const ArticleOptimizationPage = () => {
         // 检查是否有缓存数据
         const cacheKey = `optimization_cache_${window._Application.ActiveDocument?.Name}`;
         const cachedData = localStorage.getItem(cacheKey);
-        
         if (cachedData) {
             try {
                 const parsedCache = JSON.parse(cachedData);
@@ -378,7 +401,7 @@ const ArticleOptimizationPage = () => {
         }
     };
 
-    const handleReplaceItem = (originalItem: { id: string, text: string }, optimizedItem: { id: string, text: string }) => {
+    const handleReplaceItem = (originalItem: { id: string, text: string }, optimizedItem: { id: string, text: string, replaced?: boolean }) => {
         if (activeCardId) {
             restoreOriginalStyle(activeCardId);
             originalStylesMap.current.delete(activeCardId);
@@ -411,8 +434,6 @@ const ArticleOptimizationPage = () => {
                 paragraph.Range.ParagraphFormat.CharacterUnitLeftIndent = CharacterUnitLeftIndent;
                 paragraph.Range.ParagraphFormat.FirstLineIndent = firstLineIndent;
                 replaced = true;
-                window._Application.ActiveDocument.Sync.PutUpdate();
-                paragraph.Range.Find.Execute();
                 break;
             }
         }
@@ -421,13 +442,14 @@ const ArticleOptimizationPage = () => {
             const newOptimizedData = [...optimizedData];
             const itemIndex = newOptimizedData.findIndex(item => item.id === optimizedItem.id);
             if (itemIndex !== -1) {
-                newOptimizedData[itemIndex] = optimizedItem;
+                newOptimizedData[itemIndex] = {...optimizedItem, replaced: true};
                 setOptimizedData(newOptimizedData);
+                window._Application.ActiveDocument.Sync.PutUpdate();
             }
 
             setReplacedItems(prev => {
                 const newSet = new Set(prev);
-                newSet.add(optimizedItem.id);
+                newSet.add(originalItem.id);
                 return newSet;
             });
             
@@ -553,8 +575,8 @@ const ArticleOptimizationPage = () => {
             const optimizedItem = optimizedData.find(opt => opt.id === item.id);
             return optimizedItem &&
                 !optimizedItem.notImprove &&
-                optimizedItem.text.trim() !== item.text.trim() &&
-                !replacedItems.has(item.id);
+                !optimizedItem.replaced &&
+                optimizedItem.text.trim() !== item.text.trim();
         });
 
         if (filteredData.length === 0) {
@@ -736,6 +758,12 @@ const ArticleOptimizationPage = () => {
                                                                 setActiveCardId(null);
                                                                 originalStylesMap.current.delete(item.id);
                                                             }
+                                                            const newOptimizedData = [...optimizedData];
+                                                            const itemIndex = newOptimizedData.findIndex(opt => opt.id === item.id);
+                                                            if (itemIndex !== -1) {
+                                                                newOptimizedData[itemIndex] = {...newOptimizedData[itemIndex], replaced: true};
+                                                                setOptimizedData(newOptimizedData);
+                                                            }
                                                             setReplacedItems(prev => {
                                                                 const newSet = new Set(prev);
                                                                 newSet.add(item.id);
@@ -769,9 +797,7 @@ const ArticleOptimizationPage = () => {
     }, [activeCardId]);
 
     useEffect(() => {
-        if(!loading) {
             handleStartProcess();
-        }
     }, []);
 
     // 监听文档名称变化
