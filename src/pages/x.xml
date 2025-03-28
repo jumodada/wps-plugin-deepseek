@@ -58,24 +58,10 @@
                 xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
                 xmlns:wpsCustomData="http://www.wps.cn/officeDocument/2013/wpsCustomData" mc:Ignorable="w14 w15 wp14">
                 <w:body>
-                    <w:p w14:paraId="231D5F34">
-                        <w:pPr>
-                            <w:jc w:val="center"/>
-                            <w:rPr>
-                                <w:rFonts w:hint="eastAsia" w:ascii="微软雅黑" w:hAnsi="微软雅黑" w:eastAsia="微软雅黑" w:cs="微软雅黑"/>
-                                <w:b/>
-                                <w:bCs/>
-                                <w:sz w:val="36"/>
-                                <w:szCs w:val="36"/>
-                                <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
-                            </w:rPr>
-                        </w:pPr>
-                        <w:bookmarkStart w:id="33" w:name="_GoBack"/>
-                        <w:bookmarkEnd w:id="33"/>
-                    </w:p>
                     <w:p w14:paraId="37DA902F">
                         <w:pPr>
-                            <w:jc w:val="center"/>
+                            <w:ind w:left="5742" w:leftChars="2610" w:firstLine="3203" w:firstLineChars="1000"/>
+                            <w:jc w:val="both"/>
                             <w:rPr>
                                 <w:rFonts w:hint="eastAsia" w:ascii="微软雅黑" w:hAnsi="微软雅黑" w:eastAsia="微软雅黑" w:cs="微软雅黑"/>
                                 <w:b/>
@@ -86,18 +72,6 @@
                                 <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
                             </w:rPr>
                         </w:pPr>
-                        <w:r>
-                            <w:rPr>
-                                <w:rFonts w:hint="eastAsia" w:ascii="微软雅黑" w:hAnsi="微软雅黑" w:eastAsia="微软雅黑" w:cs="微软雅黑"/>
-                                <w:b/>
-                                <w:bCs/>
-                                <w:sz w:val="44"/>
-                                <w:szCs w:val="44"/>
-                                <w:u w:val="none"/>
-                                <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
-                            </w:rPr>
-                            <w:t xml:space="preserve"></w:t>
-                        </w:r>
                         <w:r>
                             <w:rPr>
                                 <w:rFonts w:hint="eastAsia" w:ascii="微软雅黑" w:hAnsi="微软雅黑" w:eastAsia="微软雅黑" w:cs="微软雅黑"/>
@@ -255,7 +229,19 @@
                                 <w:u w:val="none"/>
                                 <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
                             </w:rPr>
-                            <w:t>2.1、WPS插件部署</w:t>
+                            <w:t>2.1、WPS插件部</w:t>
+                        </w:r>
+                        <w:bookmarkStart w:id="33" w:name="_GoBack"/>
+                        <w:bookmarkEnd w:id="33"/>
+                        <w:r>
+                            <w:rPr>
+                                <w:rFonts w:hint="eastAsia" w:hAnsi="宋体" w:cs="宋体"/>
+                                <w:sz w:val="24"/>
+                                <w:szCs w:val="24"/>
+                                <w:u w:val="none"/>
+                                <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
+                            </w:rPr>
+                            <w:t>署</w:t>
                         </w:r>
                     </w:p>
                     <w:p w14:paraId="7F9D2C94">
@@ -2557,7 +2543,7 @@
                                                         <Characters>1501</Characters>
                                                         <Lines>13</Lines>
                                                         <Paragraphs>3</Paragraphs>
-                                                        <TotalTime>28</TotalTime>
+                                                        <TotalTime>30</TotalTime>
                                                         <ScaleCrop>false</ScaleCrop>
                                                         <LinksUpToDate>false</LinksUpToDate>
                                                         <CharactersWithSpaces>1530</CharactersWithSpaces>
@@ -2577,7 +2563,7 @@
                                                         <dcterms:created xsi:type="dcterms:W3CDTF">2022-09-26T09:46:00Z</dcterms:created>
                                                         <dc:creator>Administrator</dc:creator>
                                                         <cp:lastModifiedBy>火猫</cp:lastModifiedBy>
-                                                        <dcterms:modified xsi:type="dcterms:W3CDTF">2025-03-28T10:26:11Z</dcterms:modified>
+                                                        <dcterms:modified xsi:type="dcterms:W3CDTF">2025-03-28T10:28:59Z</dcterms:modified>
                                                         <cp:revision>6</cp:revision>
                                                     </cp:coreProperties>
                                                 </pkg:xmlData>
@@ -3050,7 +3036,9 @@
                                                             <w:rsid w:val="5F5138A6"/>
                                                             <w:rsid w:val="5F931FFA"/>
                                                             <w:rsid w:val="5FDF1118"/>
+                                                            <w:rsid w:val="5FFD7B68"/>
                                                             <w:rsid w:val="5FFF29E3"/>
+                                                            <w:rsid w:val="5FFFB894"/>
                                                             <w:rsid w:val="604604D2"/>
                                                             <w:rsid w:val="612F24D1"/>
                                                             <w:rsid w:val="63321D8E"/>
@@ -3095,6 +3083,7 @@
                                                             <w:rsid w:val="ADCF7510"/>
                                                             <w:rsid w:val="AECAD105"/>
                                                             <w:rsid w:val="B779BC94"/>
+                                                            <w:rsid w:val="B7F70291"/>
                                                             <w:rsid w:val="BD9EE8E3"/>
                                                             <w:rsid w:val="BE7EA36E"/>
                                                             <w:rsid w:val="BF5F8A86"/>
@@ -3106,6 +3095,7 @@
                                                             <w:rsid w:val="DE5FCD79"/>
                                                             <w:rsid w:val="DFA53315"/>
                                                             <w:rsid w:val="DFFBF28C"/>
+                                                            <w:rsid w:val="E5B76ADB"/>
                                                             <w:rsid w:val="E6BB8986"/>
                                                             <w:rsid w:val="E75F4D7F"/>
                                                             <w:rsid w:val="E7EF9AA4"/>

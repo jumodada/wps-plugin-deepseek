@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 ./_test
+wps-addon-build/
