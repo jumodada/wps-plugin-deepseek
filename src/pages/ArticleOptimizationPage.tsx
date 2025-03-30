@@ -186,32 +186,6 @@ const ArticleOptimizationPage = () => {
             return;
         }
 
-        // 检查是否有缓存数据
-        const cacheKey = `optimization_cache_${window._Application.ActiveDocument?.Name}`;
-        const cachedData = localStorage.getItem(cacheKey);
-        if (cachedData) {
-            try {
-                const parsedCache = JSON.parse(cachedData);
-                // 检查缓存数据是否与当前文档内容匹配
-                if (parsedCache.originalData && 
-                    parsedCache.originalData.length === structuredData.length &&
-                    parsedCache.originalData.every((item: any, index: number) => 
-                        item.id === structuredData[index].id && 
-                        item.text === structuredData[index].text
-                    )) {
-                    setOriginalData(parsedCache.originalData);
-                    setOptimizedData(parsedCache.optimizedData);
-                    setShowResults(true);
-                    setLoading(false);
-                    message.success('使用缓存数据');
-                    return;
-                }
-            } catch (error) {
-                console.error('解析缓存数据失败:', error);
-                localStorage.removeItem(cacheKey);
-            }
-        }
-
         setOriginalData(structuredData);
         setProcessingStatus(`正在处理文档内容...`);
 
@@ -369,16 +343,6 @@ const ArticleOptimizationPage = () => {
                     setOptimizedData(itemsWithDiff);
                     setShowResults(true);
                     setLoading(false);
-                    
-                    // 保存到 localStorage
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify({
-                            originalData: structuredData,
-                            optimizedData: itemsWithDiff
-                        }));
-                    } catch (error) {
-                        console.error('保存缓存数据失败:', error);
-                    }
                     
                     message.success('处理完成！请查看优化结果并选择是否替换。');
                 } catch (error) {

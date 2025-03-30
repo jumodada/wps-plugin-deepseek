@@ -14,6 +14,22 @@ interface XMLNavbarButtons {
 }
 
 export const xmlNavbarButtons: XMLNavbarButtons = {
+    allArticleOptimization: {
+        id: 'allArticleOptimization',
+        label: '文档预览',
+        image: 'images/1.svg',
+        onAction: () => {
+            const tsId = window._Application.PluginStorage.getItem('all_article_pane_id');
+            if (!tsId) {
+                const taskPane = window._Application.CreateTaskPane(GetUrlPath() + '/all-article-optimization');
+                window._Application.PluginStorage.setItem('all_article_pane_id', taskPane.ID);
+                taskPane.Visible = true;
+            } else {
+                const taskPane = window._Application.GetTaskPane(tsId);
+                taskPane.Visible = !taskPane.Visible;
+            }
+        }
+    },
     articleOptimization: {
         id: 'articleOptimization',
         label: '文章优化',
