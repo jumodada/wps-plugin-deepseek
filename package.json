@@ -39,6 +39,7 @@
 		"typescript-eslint": "^8.24.1",
 		"vite": "^6.2.0",
 		"vite-plugin-style-import": "^2.0.0",
-		"wps-jsapi-declare": "latest"
+		"wps-jsapi-declare": "latest",
+		"wpsjs": "latest"
 	}
 }
