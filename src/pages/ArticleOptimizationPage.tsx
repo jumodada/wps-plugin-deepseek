@@ -378,9 +378,9 @@ const ArticleOptimizationPage = () => {
         for (let i = 1; i <= paragraphCount; i++) {
             const paragraph = window._Application.ActiveDocument?.Paragraphs.Item(i);
             if (paragraph.ParaID === originalItem.id) {
-                paragraph.Range.Copy();
-                paragraph.Range.InsertParagraphAfter();
-                window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Paste();
+               // paragraph.Range.Copy();
+            //    paragraph.Range.InsertParagraphAfter();
+           //     window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Paste();
                 const originalStyle = {...paragraph.Style};
                 const originalFont = {...paragraph.Style.Font};
                 const CharacterUnitFirstLineIndent = paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent;
@@ -391,7 +391,7 @@ const ArticleOptimizationPage = () => {
                     newText = newText + '\r';
                 }
                 paragraph.Range.Text = newText;
-                window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Delete();
+              //  window._Application.ActiveDocument?.Paragraphs.Item(i + 1).Range.Delete();
                 paragraph.Style = originalStyle;
                 paragraph.Style.Font = originalFont;
                 paragraph.Range.ParagraphFormat.CharacterUnitFirstLineIndent = CharacterUnitFirstLineIndent;
