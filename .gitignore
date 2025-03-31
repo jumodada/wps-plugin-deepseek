@@ -24,6 +24,10 @@ dist-ssr
 *.sw?
 ./_test
 wps-addon-build/
+
+# Environment files
 .env
+.env.local
+.env.*.local
 .env.development
 .env.production

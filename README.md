@@ -29,3 +29,26 @@ wpsjs build
 ## 参考资源
 
 - [WPS开放平台文档](https://qn.cache.wpscdn.cn/)
+
+## 环境配置
+
+项目使用环境变量来管理配置信息。在开始开发之前，你需要设置正确的环境变量。
+
+### 开发环境配置
+
+1. 复制 `env.json` 文件并重命名为 `.env.development`
+2. 在 `.env.development` 文件中填入你的 API 密钥：
+   - `VITE_DEEPSEEK_API_KEY`: 你的 DeepSeek API 密钥
+
+### 生产环境配置
+
+1. 复制 `env.json` 文件并重命名为 `.env.production`
+2. 在 `.env.production` 文件中填入你的生产环境 API 密钥
+
+### 环境变量说明
+
+- `VITE_DEEPSEEK_API_BASEURL`: DeepSeek API 的基础 URL
+- `VITE_DEEPSEEK_API_KEY`: DeepSeek API 密钥
+- `VITE_API_BASE_URL_AI`: AI API 的基础 URL
+
+注意：请确保不要将包含实际 API 密钥的 `.env` 文件提交到版本控制系统中。

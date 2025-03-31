@@ -50,8 +50,7 @@ export interface DeepSeekResponse {
 export const submitOptimization = (params: DeepSeekRequest) => {
   return apiClient.post<DeepSeekResponse>('/v1/chat/completions', {
     messages: params.messages,
-    model: params.model || "deepseek-chat",
-    temperature: params.temperature || 1.5,
+    model: "qwen-plus",
     stream: false,
     max_tokens: 8192,
   }, {
@@ -77,10 +76,9 @@ export const generateDiffAnalysis = (params: {
         content: `请分析以下原文和优化后文本之间的差异，返回一个JSON格式的diff数组，每个元素表示一个修改点（如词语替换、删除、添加）：\n\n原文：${params.original}\n\n优化后：${params.optimized}\n\n请用这样的格式表示差异点：\n1. 替换：使用"原词 → 新词"\n2. 删除：使用"-删除的内容"\n3. 添加：使用"+添加的内容"\n\n请直接返回JSON格式：["差异点1", "差异点2", ...]`
       }
     ],
-    model: params.model || "deepseek-chat",
-    temperature: 0.5,
+    model: "qwen-plus",
     stream: false,
-    max_tokens: 4096,
+    max_tokens: 8192,
   }, {
     signal: params.signal
   });
