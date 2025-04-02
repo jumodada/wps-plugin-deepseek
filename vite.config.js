@@ -16,9 +16,18 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       host:'0.0.0.0',
-      cors: true,
+      cors: {
+        origin: '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+      },
       proxy: {
         '/v1': {
+          target: env.VITE_DEEPSEEK_API_BASEURL,
+          changeOrigin: true,
+          rewrite: (path) => path,
+        },
+        '/api': {
           target: env.VITE_DEEPSEEK_API_BASEURL,
           changeOrigin: true,
           rewrite: (path) => path,
