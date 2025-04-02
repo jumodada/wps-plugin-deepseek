@@ -1,0 +1,840 @@
+<template>
+  <div class="optimization-container">
+    <div v-if="loading" class="loading-container">
+      <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
+      <div class="spinner"></div>
+    </div>
+    
+    <div v-else-if="showResults" class="results-container">
+      <!-- 无优化结果情况 -->
+      <div v-if="filteredData.length === 0" class="empty-result">
+        <div class="result-card">
+          <p>{{ replacedItems.size > 0 ? '所有内容已成功替换' : '没有需要优化的内容或优化内容与原内容相同' }}</p>
+          <span class="back-link" @click="goBack">
+            <span class="icon">←</span>
+            返回
+          </span>
+        </div>
+      </div>
+      
+      <!-- 优化结果列表 -->
+      <div v-else class="results-list">
+        <div class="section-header">
+          <h3>全部 ({{ filteredData.length }})</h3>
+        </div>
+        
+        <div class="cards-container">
+          <div 
+            v-for="item in filteredData" 
+            :key="item.id" 
+            class="optimization-card"
+            :class="{ 'active': activeCardId === item.id }"
+            @click="handleLocateInDocument(item.id)"
+            :ref="el => { if (el) cardRefs[item.id] = el }"
+          >
+            <!-- 差异展示区 -->
+            <div v-if="getDiffDisplay(getOptimizedItem(item.id))" class="diff-display" v-html="getDiffDisplay(getOptimizedItem(item.id))"></div>
+            
+            <!-- 优化后文本 -->
+            <div class="optimized-text" :class="{ 'replaced': replacedItems.has(item.id) }" v-html="getHighlightedText(getOptimizedItem(item.id))">
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+              <span class="action-button replace" @click.stop="handleReplaceItem(item, getOptimizedItem(item.id))">
+                <span class="icon">✓</span>
+                替换
+              </span>
+              <span class="action-button ignore" @click.stop="handleIgnoreItem(item.id)">
+                <span class="icon">✕</span>
+                忽略
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 底部返回按钮 -->
+        <div class="bottom-actions">
+          <span class="back-link" @click="goBack">
+            <span class="icon">←</span>
+            返回
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { generateDiffAnalysis } from '../api/deepseek';
+import { 
+  isWordDocument, 
+  extractParagraphsFromDocument, 
+  handleImageLineBreak, 
+  retryOptimization,
+  prepareDataForDeepseek,
+  updateOptimizedData,
+  replaceParagraphInDocument,
+  buildOptimizationMessages
+} from '../tool/optimization';
+import { message } from 'ant-design-vue';
+
+export default {
+  name: 'ArticleOptimizationPage',
+  setup() {
+    // 状态变量
+    const loading = ref(false);
+    const processingStatus = ref('');
+    const originalData = ref([]);
+    const optimizedData = ref([]);
+    const showResults = ref(false);
+    const replacedItems = ref(new Set());
+    const activeCardId = ref(null);
+    const activeDocumentName = ref(null);
+    const originalStylesMap = ref(new Map());
+    const cancelTokenRef = ref(null);
+    const processingRef = ref(false);
+    const previousActiveCardId = ref(null);
+    const cardRefs = ref({});
+    
+    // 计算属性 - 过滤需要展示的数据
+    const filteredData = computed(() => {
+      return originalData.value.filter(item => {
+        const optimizedItem = optimizedData.value.find(opt => opt.id === item.id);
+        return optimizedItem &&
+          !optimizedItem.notImprove &&
+          !optimizedItem.replaced &&
+          optimizedItem.text.trim() !== item.text.trim();
+      });
+    });
+    
+    // 根据ID获取优化后的项目
+    const getOptimizedItem = (id) => {
+      return optimizedData.value.find(item => item.id === id);
+    };
+    
+    // 获取差异展示内容
+    const getDiffDisplay = (optimizedItem) => {
+      if (!optimizedItem || !optimizedItem.originalText || !optimizedItem.text) {
+        return '';
+      }
+      
+      // 如果有diff分析结果，使用它们
+      if (optimizedItem.diff && optimizedItem.diff.length > 0) {
+        // 如果差异点太多，只展示前5个
+        const diffToShow = optimizedItem.diff;
+        const diffHtml = diffToShow.map((diff, index) => {
+          // 处理新的JSON格式: { originText: "原文词", replacedText: "替换词" }
+          if (diff.originText !== undefined && diff.replacedText !== undefined) {
+            // 处理删除情况 - replacedText为空
+            if (diff.originText && diff.replacedText === '') {
+              return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → 删除</div>`;
+            }
+            // 处理新增情况 - originText为空
+            else if (diff.originText === '' && diff.replacedText) {
+              return `<div class="diff-item">${index + 1}. 【新增】：<span class="added">${diff.replacedText}</span></div>`;
+            }
+            // 处理替换情况
+            else {
+              return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → <span class="added">${diff.replacedText}</span></div>`;
+            }
+          }
+          // 兼容旧格式
+          else if (typeof diff === 'string') {
+            let formattedDiff = diff;
+            
+            // 处理替换模式 "A → B"
+            if (diff.includes('→')) {
+              const parts = diff.split('→');
+              if (parts.length === 2) {
+                const original = parts[0].trim();
+                const optimized = parts[1].trim();
+                
+                // 处理删除情况 "[A→]"
+                if (original.startsWith('[') && original.endsWith(']') && optimized === '') {
+                  const deletedText = original.substring(1, original.length - 1);
+                  formattedDiff = `<span class="deleted">${deletedText}</span> → 删除`;
+                } 
+                // 处理新增情况 "→【A】"
+                else if (original === '' && optimized.startsWith('【') && optimized.endsWith('】')) {
+                  const addedText = optimized.substring(1, optimized.length - 1);
+                  formattedDiff = `新增 → <span class="added">${addedText}</span>`;
+                }
+                // 处理普通替换
+                else {
+                  formattedDiff = `<span class="deleted">${original}</span> → <span class="added">${optimized}</span>`;
+                }
+              }
+            }
+            // 处理"新增【内容】"格式
+            else if (diff.startsWith('新增【') && diff.endsWith('】')) {
+              const addedText = diff.substring(3, diff.length - 1);
+              formattedDiff = `新增 → <span class="added">${addedText}</span>`;
+            }
+            
+            return `<div class="diff-item">${index + 1}. ${formattedDiff}</div>`;
+          }
+          // 其他意外情况，返回原始内容
+          return `<div class="diff-item">${index + 1}. <span>${JSON.stringify(diff)}</span></div>`;
+        }).join('');
+        
+        return diffHtml;
+      }
+      
+      // 如果没有差异分析结果
+      return '';
+    };
+    
+    // 获取高亮后的优化文本
+    const getHighlightedText = (optimizedItem) => {
+      if (!optimizedItem || !optimizedItem.text || !optimizedItem.diff || optimizedItem.diff.length === 0) {
+        return optimizedItem?.text || '';
+      }
+      
+      let text = optimizedItem.text;
+      const highlightWords = [];
+      
+      // 收集所有需要高亮的文本
+      optimizedItem.diff.forEach(diff => {
+        // 处理新的JSON格式
+        if (diff.originText !== undefined && diff.replacedText !== undefined) {
+          // 只对替换和新增的文本进行高亮处理
+          if (diff.replacedText) {
+            highlightWords.push(diff.replacedText);
+          }
+        }
+        // 兼容旧格式
+        else if (typeof diff === 'string') {
+          if (diff.includes('→')) {
+            // 处理替换情况，提取箭头右边的内容
+            const parts = diff.split('→');
+            if (parts.length === 2) {
+              const optimized = parts[1].trim();
+              // 检查是否是新增格式
+              if (optimized.startsWith('【') && optimized.endsWith('】')) {
+                // 提取【】中的内容
+                const addedText = optimized.substring(1, optimized.length - 1);
+                highlightWords.push(addedText);
+              } else if (optimized) {
+                highlightWords.push(optimized);
+              }
+            }
+          } else if (diff.startsWith('新增【') && diff.endsWith('】')) {
+            // 处理"新增【内容】"格式
+            const addedText = diff.substring(3, diff.length - 1);
+            highlightWords.push(addedText);
+          } else if (diff.includes('【') && diff.includes('】')) {
+            // 提取所有【】括起来的内容
+            const regex = /【([^【】]+)】/g;
+            let match;
+            while ((match = regex.exec(diff)) !== null) {
+              highlightWords.push(match[1]);
+            }
+          }
+        }
+      });
+      
+      // 对收集到的词语进行排序，优先处理较长的词语以避免部分替换问题
+      highlightWords.sort((a, b) => b.length - a.length);
+      
+      // 对文本中的每个高亮词语进行处理
+      highlightWords.forEach(word => {
+        if (word && text.includes(word)) {
+          // 生成唯一标记，避免替换冲突
+          const uniqueMark = `__HIGHLIGHT_${Math.random().toString(36).substring(2, 10)}__`;
+          
+          // 转义正则表达式中的特殊字符
+          const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          
+          // 替换文本中的词语为唯一标记
+          text = text.replace(new RegExp(escapedWord, 'g'), uniqueMark);
+          
+          // 记录唯一标记与原词语的映射关系
+          text = text.replace(new RegExp(uniqueMark, 'g'), `<span class="highlight-added">${word}</span>`);
+        }
+      });
+      
+      return text;
+    };
+    
+    // 恢复原始样式
+    const restoreOriginalStyle = (paragraphId) => {
+      if (paragraphId) {
+        const originalStyle = originalStylesMap.value.get(paragraphId);
+        if (originalStyle) {
+          const paragraphCount = window.Application.ActiveDocument?.Paragraphs.Count;
+          for (let i = 1; i <= paragraphCount; i++) {
+            const paragraph = window.Application.ActiveDocument?.Paragraphs.Item(i);
+            if (paragraph.ParaID === paragraphId) {
+              const underline = originalStyle.underline === 9999999 ? 0 : originalStyle.underline;
+              const color = originalStyle.color === 9999999 ? 0 : originalStyle.color;
+              paragraph.Range.Font.Underline = underline;
+              paragraph.Range.Font.Color = color;
+              break;
+            }
+          }
+        }
+      } else {
+        // 恢复所有段落样式
+        originalStylesMap.value.forEach((_, paragraphId) => {
+          restoreOriginalStyle(paragraphId);
+        });
+      }
+    };
+
+    // 处理返回操作
+    const goBack = () => {
+      restoreOriginalStyle();
+      activeCardId.value = null;
+      showResults.value = false;
+      handleStartProcess();
+    };
+    
+    // 处理忽略项目
+    const handleIgnoreItem = (id) => {
+      if (activeCardId.value === id) {
+        restoreOriginalStyle(id);
+        activeCardId.value = null;
+        originalStylesMap.value.delete(id);
+      }
+      
+      const newOptimizedData = [...optimizedData.value];
+      const itemIndex = newOptimizedData.findIndex(item => item.id === id);
+      if (itemIndex !== -1) {
+        newOptimizedData[itemIndex] = {...newOptimizedData[itemIndex], replaced: true};
+        optimizedData.value = newOptimizedData;
+      }
+      
+      replacedItems.value.add(id);
+    };
+    
+    // 处理替换文本
+    const handleReplaceItem = (originalItem, optimizedItem) => {
+      if (activeCardId.value) {
+        restoreOriginalStyle(activeCardId.value);
+        originalStylesMap.value.delete(activeCardId.value);
+      }
+      activeCardId.value = null;
+      
+      // 检查是否有优化的内容
+      if (!optimizedItem || optimizedItem.notImprove) {
+        message.warning('没有需要优化的内容');
+        return;
+      }
+      
+      // 替换文档中的内容
+      const result = replaceParagraphInDocument(
+        originalItem.id, 
+        originalItem,  // 传递整个originalItem对象
+        optimizedItem.text
+      );
+
+      if (result.replaced) {
+        // 更新状态
+        const newOptimizedData = [...optimizedData.value];
+        const itemIndex = newOptimizedData.findIndex(item => item.id === optimizedItem.id);
+        if (itemIndex !== -1) {
+          newOptimizedData[itemIndex] = {...optimizedItem, replaced: true};
+          optimizedData.value = newOptimizedData;
+        }
+
+        replacedItems.value.add(originalItem.id);
+        originalStylesMap.value.delete(originalItem.id);
+        
+        // 同步文档状态
+        window.Application.ActiveDocument.Sync.PutUpdate();
+        
+        // 强制触发UI更新，但保持光标在当前段落
+        const position = result.position >= 0 ? result.position : 0;
+        window.Application.ActiveDocument.Range(position, position).Select();
+        
+        message.success(`已替换内容`);
+      } else {
+        message.warning(`未找到原文内容相符的段落`);
+      }
+    };
+    
+    // 定位到文档中的段落
+    const handleLocateInDocument = (paragraphId) => {
+      if (activeCardId.value && activeCardId.value !== paragraphId) {
+        restoreOriginalStyle(activeCardId.value);
+        activeCardId.value = null;
+      }
+      
+      if (activeCardId.value === paragraphId) {
+        restoreOriginalStyle(paragraphId);
+        activeCardId.value = null;
+        return;
+      }
+      
+      const paragraphCount = window.Application.ActiveDocument?.Paragraphs.Count;
+      let found = false;
+      let paragraphStart = -1;
+
+      for (let i = 1; i <= paragraphCount; i++) {
+        const paragraph = window.Application.ActiveDocument?.Paragraphs.Item(i);
+        try {
+          if (paragraph.ParaID === paragraphId) {
+            // 获取段落起始位置
+            paragraphStart = paragraph.Range.Start;
+            
+            // 选中段落
+            paragraph.Range.Select();
+            found = true;
+
+            const selection = window.Application.Selection;
+            const underlineStyle = selection.Font.Underline === 9999999 ? 0 : selection.Font.Underline;
+            const colorStyle = selection.Font.Color === 9999999 ? 0 : selection.Font.Color;
+            
+            originalStylesMap.value.set(paragraphId, {
+              underline: underlineStyle,
+              color: colorStyle
+            });
+            
+            selection.Font.Underline = 11;
+            selection.Font.Color = 255;
+            
+            activeCardId.value = paragraphId;
+            
+            // 滚动到对应卡片位置
+            if (cardRefs.value[paragraphId]) {
+              cardRefs.value[paragraphId]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+              });
+            }
+            
+            break;
+          }
+        } catch (error) {
+          console.error('定位到段落时出错:', error);
+        }
+      }
+
+      if (!found) {
+        message.warning('未找到对应内容的段落');
+      } else {
+        // 保存当前光标位置信息，便于后续操作
+        localStorage.setItem('currentPosition', paragraphStart);
+      }
+    };
+    
+    // 启动处理流程
+    const handleStartProcess = async () => {
+      cancelTokenRef.value = new AbortController();
+      processingRef.value = true;
+
+      loading.value = true;
+
+      if (!isWordDocument()) {
+        loading.value = false;
+        return;
+      }
+
+      processingStatus.value = '正在处理文档中的图片...';
+      // 先处理图片换行问题
+      handleImageLineBreak();
+
+      processingStatus.value = '正在提取文档段落内容...';
+      const structuredData = extractParagraphsFromDocument();
+
+      if (structuredData.length === 0) {
+        message.warning('无法从文档中提取有效内容');
+        loading.value = false;
+        return;
+      }
+
+      originalData.value = structuredData;
+      processingStatus.value = `正在处理文档内容...`;
+
+      try {
+        // 准备发送给API的数据
+        const dataForDeepseek = prepareDataForDeepseek(structuredData);
+
+        // 构建优化API的消息提示
+        const optimizationMessages = buildOptimizationMessages(dataForDeepseek);
+
+        // 调用API进行文本优化
+        const params = {
+          messages: optimizationMessages,
+          model: "deepseek-reasoner",
+          signal: cancelTokenRef.value?.signal
+        };
+
+        const response = await retryOptimization(params);
+
+        if (!processingRef.value) {
+          loading.value = false;
+          return;
+        }
+
+        if (response.data && response.data.choices && response.data.choices.length > 0) {
+          const result = response.data.choices[0].message.content;
+          const jsonMatch = result.match(/(\[.*\])/s);
+          const jsonStr = jsonMatch ? jsonMatch[1] : result;
+          
+          try {
+            const resultData = JSON.parse(jsonStr);
+            if (Array.isArray(resultData)) {
+              // 处理返回的优化数据
+              optimizedData.value = updateOptimizedData(structuredData, resultData);
+              
+              // 如果没有有效项目，显示提示
+              if (optimizedData.value.length === 0) {
+                message.warning('没有可优化的内容');
+                showResults.value = true;
+                loading.value = false;
+                return;
+              }
+              
+              // 获取每个文本段落的差异分析
+              const diffPromises = optimizedData.value
+                .filter(item => !item.notImprove) // 只处理有变化的项目
+                .map(async (item) => {
+                  try {
+                    const diffResponse = await generateDiffAnalysis({
+                      original: item.originalText,
+                      optimized: item.text,
+                      signal: cancelTokenRef.value?.signal
+                    });
+                    
+                    if (diffResponse.data && diffResponse.data.choices && diffResponse.data.choices.length > 0) {
+                      const diffResult = diffResponse.data.choices[0].message.content;
+                      try {
+                        // 处理返回的差异分析结果
+                        const jsonStart = diffResult.indexOf('[');
+                        const jsonEnd = diffResult.lastIndexOf(']') + 1;
+                        if (jsonStart !== -1 && jsonEnd !== -1) {
+                          const jsonStr = diffResult.substring(jsonStart, jsonEnd);
+                          const diffArray = JSON.parse(jsonStr);
+                          if (Array.isArray(diffArray)) {
+                            // 更新对应项的diff属性
+                            const index = optimizedData.value.findIndex(opt => opt.id === item.id);
+                            if (index !== -1) {
+                              optimizedData.value[index].diff = diffArray;
+                            }
+                          }
+                        } else {
+                          console.error('无法找到差异分析的JSON数据');
+                        }
+                      } catch (e) {
+                        console.error('解析差异分析失败:', e);
+                      }
+                    }
+                  } catch (e) {
+                    console.error('获取差异分析失败:', e);
+                  }
+                });
+              
+              // 等待所有差异分析完成
+              await Promise.all(diffPromises);
+              
+              // 显示结果
+              showResults.value = true;
+              loading.value = false;
+              message.success('处理完成！请查看优化结果并选择是否替换。');
+            } else {
+              message.warning('无法解析API返回结果');
+              loading.value = false;
+            }
+          } catch (error) {
+            console.error('解析结果失败:', error);
+            loading.value = false;
+            message.warning('无法解析优化结果');
+          }
+        } else {
+          loading.value = false;
+          message.error('处理失败，请重试');
+        }
+      } catch (error) {
+        console.error('处理失败:', error);
+        loading.value = false;
+        if (error.name !== 'AbortError') {
+          message.error('处理失败，请重试');
+        }
+      }
+    };
+    
+    // 监听文档名称变化
+    const checkDocumentName = () => {
+      if (isWordDocument()) {
+        const currentDocName = window.Application.ActiveDocument?.Name;
+        if (activeDocumentName.value !== currentDocName) {
+          activeDocumentName.value = currentDocName;
+          if (activeDocumentName.value !== null) { // 不是首次设置才重新处理
+            handleStartProcess();
+          }
+        }
+      }
+    };
+    
+    let intervalId = null;
+    
+    onMounted(() => {
+      // 初始设置文档名
+      if (isWordDocument()) {
+        activeDocumentName.value = window.Application.ActiveDocument?.Name;
+      }
+      
+      // 设置定时检查
+      intervalId = setInterval(checkDocumentName, 1000);
+      
+      // 启动处理
+      handleStartProcess();
+    });
+    
+    onBeforeUnmount(() => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      
+      // 清理资源
+      if (cancelTokenRef.value) {
+        cancelTokenRef.value.abort();
+      }
+      
+      // 恢复所有样式
+      restoreOriginalStyle();
+    });
+    
+    // 监听activeCardId变化
+    watch(activeCardId, (newVal, oldVal) => {
+      if (newVal === null && previousActiveCardId.value) {
+        restoreOriginalStyle(previousActiveCardId.value);
+      }
+      previousActiveCardId.value = newVal;
+    });
+    
+    return {
+      loading,
+      processingStatus,
+      originalData,
+      optimizedData,
+      showResults,
+      replacedItems,
+      activeCardId,
+      filteredData,
+      getOptimizedItem,
+      getDiffDisplay,
+      getHighlightedText,
+      handleLocateInDocument,
+      handleReplaceItem,
+      handleIgnoreItem,
+      goBack,
+      cardRefs
+    };
+  }
+};
+</script>
+
+<style scoped>
+.optimization-container {
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #f0f2f5;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.loading-container {
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+  color: #333;
+}
+
+.processing-status {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #1890ff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.results-container {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.empty-result {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.result-card {
+  max-width: 500px;
+  margin: 0 auto;
+  border-left: 3px solid #1890ff;
+  background: white;
+  border-radius: 4px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.back-link {
+  cursor: pointer;
+  color: #999;
+  font-size: 15px;
+  margin-top: 15px;
+  display: inline-block;
+}
+
+.icon {
+  margin-right: 5px;
+}
+
+.results-list {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-header {
+  background-color: #f0f2f5;
+  margin-bottom: 20px;
+  padding: 10px 15px;
+  text-align: start;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.cards-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.optimization-card {
+  width: 480px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-width: 1px;
+  border-left: 3px solid #1890ff;
+  border-radius: 4px;
+  overflow: hidden;
+  background: white;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.optimization-card.active {
+  box-shadow: 0 0 10px rgba(24, 144, 255, 0.8);
+  border-width: 2px;
+  border-color: #1890ff;
+  background: #f0f8ff;
+}
+
+.diff-display {
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  background: #f9f9f9;
+  border-left: 3px solid #1890ff;
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.5;
+  max-height: none;
+}
+
+:deep(.deleted) {
+  color: #ff4d4f !important;
+  text-decoration: line-through;
+  font-weight: bold;
+  background-color: rgba(255, 77, 79, 0.1);
+  padding: 0 2px;
+}
+
+:deep(.added) {
+  color: #52c41a !important;
+  font-weight: bold;
+  background-color: rgba(82, 196, 26, 0.1);
+  padding: 0 2px;
+}
+
+.optimized-text {
+  max-height: none;
+  overflow: visible;
+  color: #333;
+  padding: 10px;
+  background: #f0f8ff;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  word-break: break-word;
+  display: block;
+  line-height: 1.6;
+}
+
+.optimized-text.replaced {
+  color: #999;
+  text-decoration: line-through;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-start;
+  gap: 15px;
+  margin-top: auto;
+}
+
+.action-button {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.action-button.replace {
+  color: #1890ff;
+}
+
+.action-button.ignore {
+  color: #999;
+}
+
+.bottom-actions {
+  text-align: center;
+  margin-top: 30px;
+  margin-bottom: 30px;
+}
+
+:deep(.diff-item) {
+  margin-bottom: 5px;
+  padding: 3px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+:deep(.diff-item:last-child) {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+:deep(.highlight-added) {
+  color: #52c41a !important;
+  font-weight: bold;
+  background-color: rgba(82, 196, 26, 0.1);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+</style> 

@@ -1,0 +1,821 @@
+'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n
+<?mso-application progid="Word.Document"?>\r\n
+<pkg:package
+    xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+    <pkg:part pkg:name="/_rels/.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml">
+        <pkg:xmlData>
+            <Relationships
+                xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+                <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+                <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+            </Relationships>
+        </pkg:xmlData>
+    </pkg:part>
+    <pkg:part pkg:name="/word/_rels/document.xml.rels" pkg:contentType="application/vnd.openxmlformats-package.relationships+xml">
+        <pkg:xmlData>
+            <Relationships
+                xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable" Target="fontTable.xml"/>
+                <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+                <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>
+                <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
+                <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+            </Relationships>
+        </pkg:xmlData>
+    </pkg:part>
+    <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+        <pkg:xmlData>
+            <w:document
+                xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:o="urn:schemas-microsoft-com:office:office"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+                xmlns:v="urn:schemas-microsoft-com:vml"
+                xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+                xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+                xmlns:w10="urn:schemas-microsoft-com:office:word"
+                xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"
+                xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+                xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+                xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+                xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+                xmlns:wpsCustomData="http://www.wps.cn/officeDocument/2013/wpsCustomData" mc:Ignorable="w14 w15 wp14">
+                <w:body>
+                    <w:p w14:paraId="3A2AF7D7">
+                        <w:pPr>
+                            <w:pBdr>
+                                <w:top w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:left w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:bottom w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:right w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                            </w:pBdr>
+                            <w:shd w:val="clear" w:color="auto" w:fill="auto"/>
+                            <w:spacing w:beforeAutospacing="1" w:afterAutospacing="1"/>
+                            <w:ind w:firstLine="3960" w:firstLineChars="1100"/>
+                            <w:rPr>
+                                <w:rFonts w:hint="default" w:eastAsia="simsun"/>
+                                <w:color w:val="auto"/>
+                                <w:u w:val="none"/>
+                                <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
+                            </w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>
+                                <w:rFonts w:hint="eastAsia" w:eastAsia="simsun"/>
+                                <w:color w:val="auto"/>
+                                <w:sz w:val="36"/>
+                                <w:szCs w:val="36"/>
+                                <w:u w:val="none"/>
+                                <w:lang w:val="en-US" w:eastAsia="zh-CN"/>
+                            </w:rPr>
+                            <w:t>服务公文</w:t>
+                        </w:r>
+                    </w:p>
+                    <w:p w14:paraId="24DBF102">
+                        <w:pPr>
+                            <w:pBdr>
+                                <w:top w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:left w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:bottom w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:right w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                            </w:pBdr>
+                            <w:shd w:val="clear" w:color="auto" w:fill="auto"/>
+                            <w:spacing w:beforeAutospacing="1" w:afterAutospacing="1"/>
+                            <w:ind w:firstLine="1440" w:firstLineChars="600"/>
+                            <w:rPr>
+                                <w:color w:val="auto"/>
+                                <w:u w:val="none"/>
+                            </w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>
+                                <w:rFonts w:eastAsia="simsun"/>
+                                <w:color w:val="auto"/>
+                                <w:u w:val="none"/>
+                            </w:rPr>
+                            <w:t>以下是对该技术服务协议的法律风险及漏洞分析，以及相应的修改建议：</w:t>
+                        </w:r>
+                    </w:p>
+                    <w:p w14:paraId="3E0F1FDC">
+                        <w:pPr>
+                            <w:pStyle w:val="2"/>
+                            <w:pBdr>
+                                <w:top w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:left w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:bottom w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:right w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                            </w:pBdr>
+                            <w:shd w:val="clear" w:color="auto" w:fill="auto"/>
+                            <w:spacing w:beforeAutospacing="1" w:afterAutospacing="1"/>
+                            <w:rPr>
+                                <w:vanish w:val="0"/>
+                            </w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>
+                                <w:rFonts w:eastAsia="simsun"/>
+                                <w:b/>
+                                <w:i w:val="0"/>
+                                <w:sz w:val="30"/>
+                            </w:rPr>
+                            <w:t>一、服务内容条款风险</w:t>
+                        </w:r>
+                    </w:p>
+                    <w:p w14:paraId="39A339FE">
+                        <w:pPr>
+                            <w:numPr>
+                                <w:ilvl w:val="0"/>
+                                <w:numId w:val="1"/>
+                            </w:numPr>
+                            <w:pBdr>
+                                <w:top w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:left w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:bottom w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                                <w:right w:val="none" w:color="auto" w:sz="0" w:space="0"/>
+                            </w:pBdr>
+                            <w:shd w:val="clear" w:color="auto" w:fill="auto"/>
+                            <w:spacing w:beforeAutospacing="1" w:afterAutospacing="1"/>
+                            <w:rPr>
+                                <w:color w:val="000000" w:themeColor="text1"/>
+                                <w:u w:val="none"/>
+                            </w:rPr>
+                        </w:pPr>
+                        <w:r>
+                            <w:rPr>
+                                <w:rFonts w:eastAsia="simsun"/>
+                                <w:b/>
+                                <w:color w:val="000000" w:themeColor="text1"/>
+                                <w:u w:val="none"/>
+                            </w:rPr>
+                            <w:t>风险点</w:t>
+                        </w:r>
+                        <w:r>
+                            <w:rPr>
+                                <w:rFonts w:eastAsia="simsun"/>
+                                <w:color w:val="000000" w:themeColor="text1"/>
+                                <w:u w:val="none"/>
+                            </w:rPr>
+                            <w:t>：服务内容描述模糊，缺乏量化标准。例如，“技术讲解、方案规划协同等技术咨询服务以及销售和客户维护等相关工作”未明确服务范围、标准及成果验收方式，容易引发争</w:t>
+                        </w:r>
+                    </w:p>
+                    <w:sectPr>
+                        <w:pgSz w:w="11907" w:h="16839"/>
+                        <w:pgMar w:top="400" w:right="1000" w:bottom="400" w:left="1000" w:header="720" w:footer="720" w:gutter="0"/>
+                        <w:cols w:space="720" w:num="1"/>
+                    </w:sectPr>
+                </w:body>
+            </w:document>
+        </pkg:xmlData>
+    </pkg:part>
+    <pkg:part pkg:name="/docProps/app.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.extended-properties+xml">
+        <pkg:xmlData>
+            <Properties
+                xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+                xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+                <TotalTime>0</TotalTime>
+                <Application>WPS Office_7.2.2.8955_F1E327BC-269C-435d-A152-05C5408002CA</Application>
+            </Properties>
+        </pkg:xmlData>
+    </pkg:part>
+    <pkg:part pkg:name="/docProps/core.xml" pkg:contentType="application/vnd.openxmlformats-package.core-properties+xml">
+        <pkg:xmlData>
+            <cp:coreProperties
+                xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                xmlns:dc="http://purl.org/dc/elements/1.1/"
+                xmlns:dcterms="http://purl.org/dc/terms/"
+                xmlns:dcmitype="http://purl.org/dc/dcmitype/"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"/>
+            </pkg:xmlData>
+        </pkg:part>
+        <pkg:part pkg:name="/word/fontTable.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml">
+            <pkg:xmlData>
+                <w:fonts
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                    xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                    xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14">
+                    <w:font w:name="Times New Roman">
+                        <w:panose1 w:val="02020603050405020304"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="roman"/>
+                        <w:pitch w:val="variable"/>
+                        <w:sig w:usb0="20007A87" w:usb1="80000000" w:usb2="00000008" w:usb3="00000000" w:csb0="000001FF" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="宋体">
+                        <w:altName w:val="汉仪书宋二KW"/>
+                        <w:panose1 w:val="00000000000000000000"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000000" w:usb1="00000000" w:usb2="00000000" w:usb3="00000000" w:csb0="00000000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Wingdings">
+                        <w:panose1 w:val="05000000000000000000"/>
+                        <w:charset w:val="02"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000000" w:usb1="00000000" w:usb2="00000000" w:usb3="00000000" w:csb0="80000000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Arial">
+                        <w:panose1 w:val="020B0604020202090204"/>
+                        <w:charset w:val="01"/>
+                        <w:family w:val="swiss"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="E0000AFF" w:usb1="00007843" w:usb2="00000001" w:usb3="00000000" w:csb0="400001BF" w:csb1="DFF70000"/>
+                    </w:font>
+                    <w:font w:name="黑体">
+                        <w:altName w:val="汉仪中黑KW"/>
+                        <w:panose1 w:val="02010609060101010101"/>
+                        <w:charset w:val="86"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="800002BF" w:usb1="38CF7CFA" w:usb2="00000016" w:usb3="00000000" w:csb0="00040001" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Courier New">
+                        <w:panose1 w:val="02070409020205090404"/>
+                        <w:charset w:val="01"/>
+                        <w:family w:val="modern"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="E0000AFF" w:usb1="40007843" w:usb2="00000001" w:usb3="00000000" w:csb0="400001BF" w:csb1="DFF70000"/>
+                    </w:font>
+                    <w:font w:name="Symbol">
+                        <w:altName w:val="Kingsoft Sign"/>
+                        <w:panose1 w:val="05050102010706020507"/>
+                        <w:charset w:val="02"/>
+                        <w:family w:val="roman"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000000" w:usb1="00000000" w:usb2="00000000" w:usb3="00000000" w:csb0="80000000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Calibri">
+                        <w:altName w:val="Helvetica Neue"/>
+                        <w:panose1 w:val="020F0502020204030204"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="swiss"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000000" w:usb1="00000000" w:usb2="00000001" w:usb3="00000000" w:csb0="0000019F" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Arial">
+                        <w:panose1 w:val="020B0604020202090204"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="E0000AFF" w:usb1="00007843" w:usb2="00000001" w:usb3="00000000" w:csb0="400001BF" w:csb1="DFF70000"/>
+                    </w:font>
+                    <w:font w:name="simsun">
+                        <w:altName w:val="苹方-简"/>
+                        <w:panose1 w:val="00000000000000000000"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000000" w:usb1="00000000" w:usb2="00000000" w:usb3="00000000" w:csb0="00000000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="汉仪书宋二KW">
+                        <w:panose1 w:val="00020600040101010101"/>
+                        <w:charset w:val="86"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="A00002BF" w:usb1="18EF7CFA" w:usb2="00000016" w:usb3="00000000" w:csb0="00040000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="苹方-简">
+                        <w:panose1 w:val="020B0400000000000000"/>
+                        <w:charset w:val="86"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="A00002FF" w:usb1="7ACFFDFB" w:usb2="00000017" w:usb3="00000000" w:csb0="00040001" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="汉仪中黑KW">
+                        <w:panose1 w:val="00020600040101010101"/>
+                        <w:charset w:val="86"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="A00002BF" w:usb1="18EF7CFA" w:usb2="00000016" w:usb3="00000000" w:csb0="00040000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Kingsoft Sign">
+                        <w:panose1 w:val="05050102010706020507"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000000" w:usb1="10000000" w:usb2="00000000" w:usb3="00000000" w:csb0="00000001" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="宋体-简">
+                        <w:panose1 w:val="02010800040101010101"/>
+                        <w:charset w:val="86"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="00000001" w:usb1="080F0000" w:usb2="00000000" w:usb3="00000000" w:csb0="00040000" w:csb1="00000000"/>
+                    </w:font>
+                    <w:font w:name="Helvetica Neue">
+                        <w:panose1 w:val="02000503000000020004"/>
+                        <w:charset w:val="00"/>
+                        <w:family w:val="auto"/>
+                        <w:pitch w:val="default"/>
+                        <w:sig w:usb0="E50002FF" w:usb1="500079DB" w:usb2="00000010" w:usb3="00000000" w:csb0="00000000" w:csb1="00000000"/>
+                    </w:font>
+                </w:fonts>
+            </pkg:xmlData>
+        </pkg:part>
+        <pkg:part pkg:name="/word/numbering.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml">
+            <pkg:xmlData>
+                <w:numbering
+                    xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:o="urn:schemas-microsoft-com:office:office"
+                    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                    xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+                    xmlns:v="urn:schemas-microsoft-com:vml"
+                    xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+                    xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                    xmlns:w10="urn:schemas-microsoft-com:office:word"
+                    xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                    xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+                    xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+                    xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+                    xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+                    xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+                    xmlns:wpsCustomData="http://www.wps.cn/officeDocument/2013/wpsCustomData" mc:Ignorable="w14 wp14">
+                    <w:abstractNum w:abstractNumId="0">
+                        <w:nsid w:val="EDFE277B"/>
+                        <w:multiLevelType w:val="multilevel"/>
+                        <w:tmpl w:val="EDFE277B"/>
+                        <w:lvl w:ilvl="0" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="decimal"/>
+                            <w:lvlText w:val="%1."/>
+                            <w:lvlJc w:val="left"/>
+                            <w:pPr>
+                                <w:tabs>
+                                    <w:tab w:val="left" w:pos="200"/>
+                                </w:tabs>
+                                <w:ind w:left="720" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="1" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="lowerLetter"/>
+                            <w:lvlText w:val="%2."/>
+                            <w:lvlJc w:val="right"/>
+                            <w:pPr>
+                                <w:ind w:left="1440" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="2" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="lowerRoman"/>
+                            <w:lvlText w:val="%3."/>
+                            <w:lvlJc w:val="left"/>
+                            <w:pPr>
+                                <w:ind w:left="2160" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="3" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="decimal"/>
+                            <w:lvlText w:val="%4."/>
+                            <w:lvlJc w:val="left"/>
+                            <w:pPr>
+                                <w:ind w:left="2880" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="4" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="lowerLetter"/>
+                            <w:lvlText w:val="%5."/>
+                            <w:lvlJc w:val="right"/>
+                            <w:pPr>
+                                <w:ind w:left="3600" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="5" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="lowerRoman"/>
+                            <w:lvlText w:val="%6."/>
+                            <w:lvlJc w:val="left"/>
+                            <w:pPr>
+                                <w:ind w:left="4320" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="6" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="decimal"/>
+                            <w:lvlText w:val="%7."/>
+                            <w:lvlJc w:val="left"/>
+                            <w:pPr>
+                                <w:ind w:left="5040" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="7" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="lowerLetter"/>
+                            <w:lvlText w:val="%8."/>
+                            <w:lvlJc w:val="right"/>
+                            <w:pPr>
+                                <w:ind w:left="5760" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                        <w:lvl w:ilvl="8" w:tentative="0">
+                            <w:start w:val="1"/>
+                            <w:numFmt w:val="lowerRoman"/>
+                            <w:lvlText w:val="%9."/>
+                            <w:lvlJc w:val="left"/>
+                            <w:pPr>
+                                <w:ind w:left="6480" w:hanging="360"/>
+                            </w:pPr>
+                            <w:rPr>
+                                <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>
+                            </w:rPr>
+                        </w:lvl>
+                    </w:abstractNum>
+                    <w:num w:numId="1">
+                        <w:abstractNumId w:val="0"/>
+                    </w:num>
+                </w:numbering>
+            </pkg:xmlData>
+        </pkg:part>
+        <pkg:part pkg:name="/word/settings.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml">
+            <pkg:xmlData>
+                <w:settings
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:o="urn:schemas-microsoft-com:office:office"
+                    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                    xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+                    xmlns:v="urn:schemas-microsoft-com:vml"
+                    xmlns:w10="urn:schemas-microsoft-com:office:word"
+                    xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                    xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+                    xmlns:sl="http://schemas.openxmlformats.org/schemaLibrary/2006/main"
+                    xmlns:wpsCustomData="http://www.wps.cn/officeDocument/2013/wpsCustomData" mc:Ignorable="w14">
+                    <w:compat>
+                        <w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="12"/>
+                    </w:compat>
+                </w:settings>
+            </pkg:xmlData>
+        </pkg:part>
+        <pkg:part pkg:name="/word/styles.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml">
+            <pkg:xmlData>
+                <w:styles
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:o="urn:schemas-microsoft-com:office:office"
+                    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                    xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+                    xmlns:v="urn:schemas-microsoft-com:vml"
+                    xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                    xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+                    xmlns:w10="urn:schemas-microsoft-com:office:word"
+                    xmlns:sl="http://schemas.openxmlformats.org/schemaLibrary/2006/main"
+                    xmlns:wpsCustomData="http://www.wps.cn/officeDocument/2013/wpsCustomData" mc:Ignorable="w14">
+                    <w:docDefaults>
+                        <w:rPrDefault>
+                            <w:rPr>
+                                <w:rFonts w:asciiTheme="minorHAnsi" w:hAnsiTheme="minorHAnsi" w:eastAsiaTheme="minorEastAsia" w:cstheme="minorBidi"/>
+                            </w:rPr>
+                        </w:rPrDefault>
+                        <w:pPrDefault/>
+                    </w:docDefaults>
+                    <w:style w:type="paragraph" w:default="1" w:styleId="1">
+                        <w:name w:val="Normal"/>
+                        <w:qFormat/>
+                        <w:uiPriority w:val="0"/>
+                        <w:rPr>
+                            <w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cstheme="minorBidi"/>
+                            <w:sz w:val="24"/>
+                            <w:szCs w:val="24"/>
+                            <w:lang w:val="en-US" w:eastAsia="uk-UA" w:bidi="ar-SA"/>
+                        </w:rPr>
+                    </w:style>
+                    <w:style w:type="paragraph" w:styleId="2">
+                        <w:name w:val="heading 3"/>
+                        <w:basedOn w:val="1"/>
+                        <w:qFormat/>
+                        <w:uiPriority w:val="0"/>
+                        <w:pPr>
+                            <w:keepNext/>
+                            <w:spacing w:before="240" w:after="60"/>
+                            <w:outlineLvl w:val="2"/>
+                        </w:pPr>
+                        <w:rPr>
+                            <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+                            <w:b/>
+                            <w:bCs/>
+                            <w:sz w:val="26"/>
+                            <w:szCs w:val="26"/>
+                        </w:rPr>
+                    </w:style>
+                </w:styles>
+            </pkg:xmlData>
+        </pkg:part>
+        <pkg:part pkg:name="/word/theme/theme1.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.theme+xml">
+            <pkg:xmlData>
+                <a:theme
+                    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office">
+                    <a:themeElements>
+                        <a:clrScheme name="Office">
+                            <a:dk1>
+                                <a:sysClr val="windowText" lastClr="000000"/>
+                            </a:dk1>
+                            <a:lt1>
+                                <a:sysClr val="window" lastClr="FFFFFF"/>
+                            </a:lt1>
+                            <a:dk2>
+                                <a:srgbClr val="1F497D"/>
+                            </a:dk2>
+                            <a:lt2>
+                                <a:srgbClr val="EEECE1"/>
+                            </a:lt2>
+                            <a:accent1>
+                                <a:srgbClr val="4F81BD"/>
+                            </a:accent1>
+                            <a:accent2>
+                                <a:srgbClr val="C0504D"/>
+                            </a:accent2>
+                            <a:accent3>
+                                <a:srgbClr val="9BBB59"/>
+                            </a:accent3>
+                            <a:accent4>
+                                <a:srgbClr val="8064A2"/>
+                            </a:accent4>
+                            <a:accent5>
+                                <a:srgbClr val="4BACC6"/>
+                            </a:accent5>
+                            <a:accent6>
+                                <a:srgbClr val="F79646"/>
+                            </a:accent6>
+                            <a:hlink>
+                                <a:srgbClr val="0000FF"/>
+                            </a:hlink>
+                            <a:folHlink>
+                                <a:srgbClr val="800080"/>
+                            </a:folHlink>
+                        </a:clrScheme>
+                        <a:fontScheme name="Office">
+                            <a:majorFont>
+                                <a:latin typeface="Cambria"/>
+                                <a:ea typeface=""/>
+                                <a:cs typeface=""/>
+                                <a:font script="Jpan" typeface="ＭＳ ゴシック"/>
+                                <a:font script="Hang" typeface="맑은 고딕"/>
+                                <a:font script="Hans" typeface="宋体"/>
+                                <a:font script="Hant" typeface="新細明體"/>
+                                <a:font script="Arab" typeface="Times New Roman"/>
+                                <a:font script="Hebr" typeface="Times New Roman"/>
+                                <a:font script="Thai" typeface="Angsana New"/>
+                                <a:font script="Ethi" typeface="Nyala"/>
+                                <a:font script="Beng" typeface="Vrinda"/>
+                                <a:font script="Gujr" typeface="Shruti"/>
+                                <a:font script="Khmr" typeface="MoolBoran"/>
+                                <a:font script="Knda" typeface="Tunga"/>
+                                <a:font script="Guru" typeface="Raavi"/>
+                                <a:font script="Cans" typeface="Euphemia"/>
+                                <a:font script="Cher" typeface="Plantagenet Cherokee"/>
+                                <a:font script="Yiii" typeface="Microsoft Yi Baiti"/>
+                                <a:font script="Tibt" typeface="Microsoft Himalaya"/>
+                                <a:font script="Thaa" typeface="MV Boli"/>
+                                <a:font script="Deva" typeface="Mangal"/>
+                                <a:font script="Telu" typeface="Gautami"/>
+                                <a:font script="Taml" typeface="Latha"/>
+                                <a:font script="Syrc" typeface="Estrangelo Edessa"/>
+                                <a:font script="Orya" typeface="Kalinga"/>
+                                <a:font script="Mlym" typeface="Kartika"/>
+                                <a:font script="Laoo" typeface="DokChampa"/>
+                                <a:font script="Sinh" typeface="Iskoola Pota"/>
+                                <a:font script="Mong" typeface="Mongolian Baiti"/>
+                                <a:font script="Viet" typeface="Times New Roman"/>
+                                <a:font script="Uigh" typeface="Microsoft Uighur"/>
+                                <a:font script="Geor" typeface="Sylfaen"/>
+                            </a:majorFont>
+                            <a:minorFont>
+                                <a:latin typeface="Calibri"/>
+                                <a:ea typeface=""/>
+                                <a:cs typeface=""/>
+                                <a:font script="Jpan" typeface="ＭＳ 明朝"/>
+                                <a:font script="Hang" typeface="맑은 고딕"/>
+                                <a:font script="Hans" typeface="宋体"/>
+                                <a:font script="Hant" typeface="新細明體"/>
+                                <a:font script="Arab" typeface="Arial"/>
+                                <a:font script="Hebr" typeface="Arial"/>
+                                <a:font script="Thai" typeface="Cordia New"/>
+                                <a:font script="Ethi" typeface="Nyala"/>
+                                <a:font script="Beng" typeface="Vrinda"/>
+                                <a:font script="Gujr" typeface="Shruti"/>
+                                <a:font script="Khmr" typeface="DaunPenh"/>
+                                <a:font script="Knda" typeface="Tunga"/>
+                                <a:font script="Guru" typeface="Raavi"/>
+                                <a:font script="Cans" typeface="Euphemia"/>
+                                <a:font script="Cher" typeface="Plantagenet Cherokee"/>
+                                <a:font script="Yiii" typeface="Microsoft Yi Baiti"/>
+                                <a:font script="Tibt" typeface="Microsoft Himalaya"/>
+                                <a:font script="Thaa" typeface="MV Boli"/>
+                                <a:font script="Deva" typeface="Mangal"/>
+                                <a:font script="Telu" typeface="Gautami"/>
+                                <a:font script="Taml" typeface="Latha"/>
+                                <a:font script="Syrc" typeface="Estrangelo Edessa"/>
+                                <a:font script="Orya" typeface="Kalinga"/>
+                                <a:font script="Mlym" typeface="Kartika"/>
+                                <a:font script="Laoo" typeface="DokChampa"/>
+                                <a:font script="Sinh" typeface="Iskoola Pota"/>
+                                <a:font script="Mong" typeface="Mongolian Baiti"/>
+                                <a:font script="Viet" typeface="Arial"/>
+                                <a:font script="Uigh" typeface="Microsoft Uighur"/>
+                                <a:font script="Geor" typeface="Sylfaen"/>
+                            </a:minorFont>
+                        </a:fontScheme>
+                        <a:fmtScheme name="Office">
+                            <a:fillStyleLst>
+                                <a:solidFill>
+                                    <a:schemeClr val="phClr"/>
+                                </a:solidFill>
+                                <a:gradFill rotWithShape="1">
+                                    <a:gsLst>
+                                        <a:gs pos="0">
+                                            <a:schemeClr val="phClr">
+                                                <a:tint val="50000"/>
+                                                <a:satMod val="300000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="35000">
+                                            <a:schemeClr val="phClr">
+                                                <a:tint val="37000"/>
+                                                <a:satMod val="300000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="100000">
+                                            <a:schemeClr val="phClr">
+                                                <a:tint val="15000"/>
+                                                <a:satMod val="350000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                    </a:gsLst>
+                                    <a:lin ang="16200000" scaled="1"/>
+                                </a:gradFill>
+                                <a:gradFill rotWithShape="1">
+                                    <a:gsLst>
+                                        <a:gs pos="0">
+                                            <a:schemeClr val="phClr">
+                                                <a:shade val="51000"/>
+                                                <a:satMod val="130000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="80000">
+                                            <a:schemeClr val="phClr">
+                                                <a:shade val="93000"/>
+                                                <a:satMod val="130000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="100000">
+                                            <a:schemeClr val="phClr">
+                                                <a:shade val="94000"/>
+                                                <a:satMod val="135000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                    </a:gsLst>
+                                    <a:lin ang="16200000" scaled="0"/>
+                                </a:gradFill>
+                            </a:fillStyleLst>
+                            <a:lnStyleLst>
+                                <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr">
+                                    <a:solidFill>
+                                        <a:schemeClr val="phClr">
+                                            <a:shade val="95000"/>
+                                            <a:satMod val="105000"/>
+                                        </a:schemeClr>
+                                    </a:solidFill>
+                                    <a:prstDash val="solid"/>
+                                </a:ln>
+                                <a:ln w="25400" cap="flat" cmpd="sng" algn="ctr">
+                                    <a:solidFill>
+                                        <a:schemeClr val="phClr"/>
+                                    </a:solidFill>
+                                    <a:prstDash val="solid"/>
+                                </a:ln>
+                                <a:ln w="38100" cap="flat" cmpd="sng" algn="ctr">
+                                    <a:solidFill>
+                                        <a:schemeClr val="phClr"/>
+                                    </a:solidFill>
+                                    <a:prstDash val="solid"/>
+                                </a:ln>
+                            </a:lnStyleLst>
+                            <a:effectStyleLst>
+                                <a:effectStyle>
+                                    <a:effectLst>
+                                        <a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0">
+                                            <a:srgbClr val="000000">
+                                                <a:alpha val="38000"/>
+                                            </a:srgbClr>
+                                        </a:outerShdw>
+                                    </a:effectLst>
+                                </a:effectStyle>
+                                <a:effectStyle>
+                                    <a:effectLst>
+                                        <a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0">
+                                            <a:srgbClr val="000000">
+                                                <a:alpha val="35000"/>
+                                            </a:srgbClr>
+                                        </a:outerShdw>
+                                    </a:effectLst>
+                                </a:effectStyle>
+                                <a:effectStyle>
+                                    <a:effectLst>
+                                        <a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0">
+                                            <a:srgbClr val="000000">
+                                                <a:alpha val="35000"/>
+                                            </a:srgbClr>
+                                        </a:outerShdw>
+                                    </a:effectLst>
+                                    <a:scene3d>
+                                        <a:camera prst="orthographicFront">
+                                            <a:rot lat="0" lon="0" rev="0"/>
+                                        </a:camera>
+                                        <a:lightRig rig="threePt" dir="t">
+                                            <a:rot lat="0" lon="0" rev="1200000"/>
+                                        </a:lightRig>
+                                    </a:scene3d>
+                                    <a:sp3d>
+                                        <a:bevelT w="63500" h="25400"/>
+                                    </a:sp3d>
+                                </a:effectStyle>
+                            </a:effectStyleLst>
+                            <a:bgFillStyleLst>
+                                <a:solidFill>
+                                    <a:schemeClr val="phClr"/>
+                                </a:solidFill>
+                                <a:gradFill rotWithShape="1">
+                                    <a:gsLst>
+                                        <a:gs pos="0">
+                                            <a:schemeClr val="phClr">
+                                                <a:tint val="40000"/>
+                                                <a:satMod val="350000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="40000">
+                                            <a:schemeClr val="phClr">
+                                                <a:tint val="45000"/>
+                                                <a:satMod val="350000"/>
+                                                <a:shade val="99000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="100000">
+                                            <a:schemeClr val="phClr">
+                                                <a:shade val="20000"/>
+                                                <a:satMod val="255000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                    </a:gsLst>
+                                    <a:path path="circle">
+                                        <a:fillToRect l="50000" t="-80000" r="50000" b="180000"/>
+                                    </a:path>
+                                </a:gradFill>
+                                <a:gradFill rotWithShape="1">
+                                    <a:gsLst>
+                                        <a:gs pos="0">
+                                            <a:schemeClr val="phClr">
+                                                <a:tint val="80000"/>
+                                                <a:satMod val="300000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                        <a:gs pos="100000">
+                                            <a:schemeClr val="phClr">
+                                                <a:shade val="30000"/>
+                                                <a:satMod val="200000"/>
+                                            </a:schemeClr>
+                                        </a:gs>
+                                    </a:gsLst>
+                                    <a:path path="circle">
+                                        <a:fillToRect l="50000" t="50000" r="50000" b="50000"/>
+                                    </a:path>
+                                </a:gradFill>
+                            </a:bgFillStyleLst>
+                        </a:fmtScheme>
+                    </a:themeElements>
+                    <a:objectDefaults/>
+                </a:theme>
+            </pkg:xmlData>
+        </pkg:part>
+    </pkg:package>'
