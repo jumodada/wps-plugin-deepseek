@@ -13,11 +13,10 @@ import { message } from 'ant-design-vue';
 
 // 创建axios实例
 const apiClient = axios.create({
-  baseURL: '/', // 接口基础路径
+  baseURL: 'http://47.104.92.121:7001/', // 接口基础路径
   timeout: 1000000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY || ''}`
   }
 });
 
