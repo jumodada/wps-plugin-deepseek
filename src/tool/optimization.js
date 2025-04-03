@@ -556,7 +556,8 @@ export const buildOptimizationMessages = (dataForDeepseek) => {
     return [
         {
             role: "system",
-            content: `你是一个专业的文章优化助手。请对文本进行词语替换和优化，保持原有段落结构。
+            content: `你是一个专业的文章优化助手。请仅对文本进行词语级别的精确替换和优化，保持原文结构和主要内容不变。替换时尽量一对一替换词语，不要添加新内容，不要重写整个句子。
+            
             输入数据中的每个元素包含：
             1. paraID：段落ID
             2. text：完整文本
@@ -566,12 +567,13 @@ export const buildOptimizationMessages = (dataForDeepseek) => {
             - 你需要生成优化后的单个文本字符串，而不是数组
             - 对于数组中的第一个元素（如果存在），视为标题，不要增加其字数
             - 如果判断某段文本不需要优化，请保持原样（使用text字段的内容）
-            - 优化时请考虑文本的连贯性和语义完整性
+            - 你的目标是使优化后的文本与原文有最小的差异，但提高表达质量
+            - 优化粒度应限制在单个词语或短语级别，不要更改整体结构
             - 返回相同格式的JSON，但每个元素只需包含paraID和优化后的text`
         },
         {
             role: "user",
-            content: `请对以下JSON格式的文章内容进行优化，保留原始结构但提升语言表达质量，返回优化后相同格式的JSON：\n\n${JSON.stringify(dataForDeepseek)}`
+            content: `请对以下JSON格式的文章内容进行词语级别的优化，仅替换需要改进的个别词语，保持整体结构不变。返回优化后相同格式的JSON：\n\n${JSON.stringify(dataForDeepseek)}`
         }
     ];
 };
