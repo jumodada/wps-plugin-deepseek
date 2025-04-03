@@ -136,7 +136,7 @@ const xmlNavbarButtons = {
     },
     showTaskPane: {
         id: 'showTaskPane',
-        label: '显示任务面板',
+        label: '文章格式化',
         image: 'images/3.svg',
         onAction: () => {
             const tsId = window.Application.PluginStorage.getItem('task_pane_id');

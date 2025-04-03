@@ -17,6 +17,11 @@ const router = createRouter({
       name: '选中文本优化',
       component: () => import('../pages/SelectionOptimizationPage.vue')
     },
+    {
+      path: '/task-pane',
+      name: '文章格式化',
+      component: () => import('../pages/ArticleFormatPage.vue')
+    },
   ]
 })
 
