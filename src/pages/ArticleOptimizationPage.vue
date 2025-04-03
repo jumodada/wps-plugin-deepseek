@@ -116,74 +116,18 @@ export default {
     
     // 获取差异展示内容
     const getDiffDisplay = (optimizedItem) => {
-      if (!optimizedItem || !optimizedItem.originalText || !optimizedItem.text) {
+      if (!optimizedItem || !optimizedItem.diff || optimizedItem.diff.length === 0) {
         return '';
       }
       
-      // 如果有diff分析结果，使用它们
-      if (optimizedItem.diff && optimizedItem.diff.length > 0) {
-        // 如果差异点太多，只展示前5个
-        const diffToShow = optimizedItem.diff;
-        const diffHtml = diffToShow.map((diff, index) => {
-          // 处理新的JSON格式: { originText: "原文词", replacedText: "替换词" }
-          if (diff.originText !== undefined && diff.replacedText !== undefined) {
-            // 处理删除情况 - replacedText为空
-            if (diff.originText && diff.replacedText === '') {
-              return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → 删除</div>`;
-            }
-            // 处理新增情况 - originText为空
-            else if (diff.originText === '' && diff.replacedText) {
-              return `<div class="diff-item">${index + 1}. 【新增】：<span class="added">${diff.replacedText}</span></div>`;
-            }
-            // 处理替换情况
-            else {
-              return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → <span class="added">${diff.replacedText}</span></div>`;
-            }
-          }
-          // 兼容旧格式
-          else if (typeof diff === 'string') {
-            let formattedDiff = diff;
-            
-            // 处理替换模式 "A → B"
-            if (diff.includes('→')) {
-              const parts = diff.split('→');
-              if (parts.length === 2) {
-                const original = parts[0].trim();
-                const optimized = parts[1].trim();
-                
-                // 处理删除情况 "[A→]"
-                if (original.startsWith('[') && original.endsWith(']') && optimized === '') {
-                  const deletedText = original.substring(1, original.length - 1);
-                  formattedDiff = `<span class="deleted">${deletedText}</span> → 删除`;
-                } 
-                // 处理新增情况 "→【A】"
-                else if (original === '' && optimized.startsWith('【') && optimized.endsWith('】')) {
-                  const addedText = optimized.substring(1, optimized.length - 1);
-                  formattedDiff = `新增 → <span class="added">${addedText}</span>`;
-                }
-                // 处理普通替换
-                else {
-                  formattedDiff = `<span class="deleted">${original}</span> → <span class="added">${optimized}</span>`;
-                }
-              }
-            }
-            // 处理"新增【内容】"格式
-            else if (diff.startsWith('新增【') && diff.endsWith('】')) {
-              const addedText = diff.substring(3, diff.length - 1);
-              formattedDiff = `新增 → <span class="added">${addedText}</span>`;
-            }
-            
-            return `<div class="diff-item">${index + 1}. ${formattedDiff}</div>`;
-          }
-          // 其他意外情况，返回原始内容
-          return `<div class="diff-item">${index + 1}. <span>${JSON.stringify(diff)}</span></div>`;
-        }).join('');
-        
-        return diffHtml;
-      }
-      
-      // 如果没有差异分析结果
-      return '';
+      // 直接使用API返回的差异点数组
+      return optimizedItem.diff.map((diff, index) => {
+        // 只处理包含originText和replacedText的对象
+        if (diff.originText !== undefined && diff.replacedText !== undefined) {
+          return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → <span class="added">${diff.replacedText}</span></div>`;
+        }
+        return '';
+      }).filter(Boolean).join('');
     };
     
     // 获取高亮后的优化文本
@@ -197,40 +141,11 @@ export default {
       
       // 收集所有需要高亮的文本
       optimizedItem.diff.forEach(diff => {
-        // 处理新的JSON格式
+        // 只处理JSON格式
         if (diff.originText !== undefined && diff.replacedText !== undefined) {
-          // 只对替换和新增的文本进行高亮处理
+          // 只对替换后的文本进行高亮处理
           if (diff.replacedText) {
             highlightWords.push(diff.replacedText);
-          }
-        }
-        // 兼容旧格式
-        else if (typeof diff === 'string') {
-          if (diff.includes('→')) {
-            // 处理替换情况，提取箭头右边的内容
-            const parts = diff.split('→');
-            if (parts.length === 2) {
-              const optimized = parts[1].trim();
-              // 检查是否是新增格式
-              if (optimized.startsWith('【') && optimized.endsWith('】')) {
-                // 提取【】中的内容
-                const addedText = optimized.substring(1, optimized.length - 1);
-                highlightWords.push(addedText);
-              } else if (optimized) {
-                highlightWords.push(optimized);
-              }
-            }
-          } else if (diff.startsWith('新增【') && diff.endsWith('】')) {
-            // 处理"新增【内容】"格式
-            const addedText = diff.substring(3, diff.length - 1);
-            highlightWords.push(addedText);
-          } else if (diff.includes('【') && diff.includes('】')) {
-            // 提取所有【】括起来的内容
-            const regex = /【([^【】]+)】/g;
-            let match;
-            while ((match = regex.exec(diff)) !== null) {
-              highlightWords.push(match[1]);
-            }
           }
         }
       });
@@ -424,7 +339,6 @@ export default {
     const handleStartProcess = async () => {
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
-
       loading.value = true;
 
       if (!isWordDocument()) {
@@ -469,84 +383,70 @@ export default {
           return;
         }
 
-        if (response.data && response.data.choices && response.data.choices.length > 0) {
-          const result = response.data.choices[0].message.content;
-          const jsonMatch = result.match(/(\[.*\])/s);
-          const jsonStr = jsonMatch ? jsonMatch[1] : result;
-          
-          try {
-            const resultData = JSON.parse(jsonStr);
-            if (Array.isArray(resultData)) {
-              // 处理返回的优化数据
-              optimizedData.value = updateOptimizedData(structuredData, resultData);
-              
-              // 如果没有有效项目，显示提示
-              if (optimizedData.value.length === 0) {
-                message.warning('没有可优化的内容');
-                showResults.value = true;
-                loading.value = false;
-                return;
-              }
-              
-              // 获取每个文本段落的差异分析
-              const diffPromises = optimizedData.value
-                .filter(item => !item.notImprove) // 只处理有变化的项目
-                .map(async (item) => {
-                  try {
-                    const diffResponse = await generateDiffAnalysis({
-                      original: item.originalText,
-                      optimized: item.text,
-                      signal: cancelTokenRef.value?.signal
-                    });
-                    
-                    if (diffResponse.data && diffResponse.data.choices && diffResponse.data.choices.length > 0) {
-                      const diffResult = diffResponse.data.choices[0].message.content;
-                      try {
-                        // 处理返回的差异分析结果
-                        const jsonStart = diffResult.indexOf('[');
-                        const jsonEnd = diffResult.lastIndexOf(']') + 1;
-                        if (jsonStart !== -1 && jsonEnd !== -1) {
-                          const jsonStr = diffResult.substring(jsonStart, jsonEnd);
-                          const diffArray = JSON.parse(jsonStr);
-                          if (Array.isArray(diffArray)) {
-                            // 更新对应项的diff属性
-                            const index = optimizedData.value.findIndex(opt => opt.id === item.id);
-                            if (index !== -1) {
-                              optimizedData.value[index].diff = diffArray;
-                            }
-                          }
-                        } else {
-                          console.error('无法找到差异分析的JSON数据');
-                        }
-                      } catch (e) {
-                        console.error('解析差异分析失败:', e);
-                      }
-                    }
-                  } catch (e) {
-                    console.error('获取差异分析失败:', e);
-                  }
-                });
-              
-              // 等待所有差异分析完成
-              await Promise.all(diffPromises);
-              
-              // 显示结果
-              showResults.value = true;
-              loading.value = false;
-              message.success('处理完成！请查看优化结果并选择是否替换。');
-            } else {
-              message.warning('无法解析API返回结果');
-              loading.value = false;
-            }
-          } catch (error) {
-            console.error('解析结果失败:', error);
-            loading.value = false;
-            message.warning('无法解析优化结果');
-          }
-        } else {
+        if (!response?.data?.choices?.length) {
           loading.value = false;
           message.error('处理失败，请重试');
+          return;
         }
+
+        const result = response.data.choices[0].message.content;
+        const jsonMatch = result.match(/(\[.*\])/s);
+        const jsonStr = jsonMatch ? jsonMatch[1] : result;
+        
+        // 解析返回的JSON
+        const resultData = JSON.parse(jsonStr);
+        if (!Array.isArray(resultData)) {
+          message.warning('无法解析API返回结果');
+          loading.value = false;
+          return;
+        }
+        
+        // 处理返回的优化数据
+        optimizedData.value = updateOptimizedData(structuredData, resultData);
+        
+        // 如果没有有效项目，显示提示
+        if (optimizedData.value.length === 0) {
+          message.warning('没有可优化的内容');
+          showResults.value = true;
+          loading.value = false;
+          return;
+        }
+        
+        // 获取每个文本段落的差异分析
+        const diffPromises = optimizedData.value
+          .filter(item => !item.notImprove) // 只处理有变化的项目
+          .map(async (item) => {
+            try {
+              const diffResponse = await generateDiffAnalysis({
+                original: item.originalText,
+                optimized: item.text,
+                signal: cancelTokenRef.value?.signal
+              });
+              
+              if (diffResponse?.data?.choices?.length) {
+                const diffResult = diffResponse.data.choices[0].message.content;
+                const diffArray = JSON.parse(diffResult);
+                
+                // 更新对应项的diff属性
+                if (Array.isArray(diffArray)) {
+                  const index = optimizedData.value.findIndex(opt => opt.id === item.id);
+                  if (index !== -1) {
+                    optimizedData.value[index].diff = diffArray;
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('获取差异分析失败:', e);
+            }
+          });
+        
+        // 等待所有差异分析完成
+        await Promise.all(diffPromises);
+        
+        // 显示结果
+        showResults.value = true;
+        loading.value = false;
+        message.success('处理完成！请查看优化结果并选择是否替换。');
       } catch (error) {
         console.error('处理失败:', error);
         loading.value = false;

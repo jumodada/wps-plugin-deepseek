@@ -1,5 +1,14 @@
 <template>
   <div class="optimization-container">
+    <!-- 文本变化提示 -->
+    <div v-if="textChangeDetected && !loading" class="text-change-alert">
+      <span>检测到选中文本已变化</span>
+      <div class="text-change-actions">
+        <span class="text-change-action" @click="handleReOptimize">重新优化</span>
+        <span class="text-change-action ignore" @click="ignoreTextChange">忽略</span>
+      </div>
+    </div>
+    
     <div v-if="loading" class="loading-container">
       <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
       <div class="spinner"></div>
@@ -82,111 +91,49 @@ export default {
     const processingRef = ref(false);
     const errorMessage = ref(''); // 添加错误消息状态
     const currentSelectionText = ref(''); // 存储当前选中的文本
-    const selectionChangeTimer = ref(null); // 用于防抖的定时器
+    const textChangeDetected = ref(false); // 添加文本变化检测状态
+    const newSelectionText = ref(''); // 存储新检测到的文本
     
     // 计算属性 - 是否已替换
     const isReplaced = computed(() => {
       return originalItem.value && replacedItems.value.has(originalItem.value.id);
     });
-    
     // 计算差异展示文本
     const diffDisplay = computed(() => {
-      if (!optimizedItem.value || !optimizedItem.value.originalText || !optimizedItem.value.text) {
+      if (!optimizedItem?.value || !optimizedItem?.value?.originalText || !optimizedItem?.value?.text) {
         return '';
       }
       
       // 如果有diff分析结果，使用它们
-      if (optimizedItem.value.diff && optimizedItem.value.diff.length > 0) {
-        return optimizedItem.value.diff.map((diff, index) => {
-          // 处理新的JSON格式: { originText: "原文词", replacedText: "替换词" }
-          if (diff.originText !== undefined && diff.replacedText !== undefined) {
-            // 处理删除情况 - replacedText为空
-            if (diff.originText && diff.replacedText === '') {
-              return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → 删除</div>`;
-            }
-            // 处理新增情况 - originText为空
-            else if (diff.originText === '' && diff.replacedText) {
-              return `<div class="diff-item">${index + 1}. 【新增】：<span class="added">${diff.replacedText}</span></div>`;
-            }
-            // 处理替换情况
-            else {
-              return `<div class="diff-item">${index + 1}. <span class="deleted">${diff.originText}</span> → <span class="added">${diff.replacedText}</span></div>`;
-            }
+      if (optimizedItem?.value?.diff && optimizedItem?.value?.diff?.length > 0) {
+        return optimizedItem?.value?.diff?.map((diff, index) => {
+          // 只处理JSON格式: { originText: "原文词", replacedText: "替换词" }
+          if (diff?.originText !== undefined && diff?.replacedText !== undefined) {
+            // 直接展示originText和replacedText，保持原有样式和箭头符号
+            return `<div class="diff-item">${index + 1}. <span class="deleted">${diff?.originText}</span> → <span class="added">${diff.replacedText}</span></div>`;
           }
-          // 兼容旧格式 (字符串形式: "A → B")
-          else if (typeof diff === 'string') {
-            // 处理替换模式: "A → B"
-            if (diff.includes('→')) {
-              const [original, optimized] = diff.split('→').map(s => s.trim());
-              return `<div class="diff-item">${index + 1}. <span class="deleted">${original}</span> → <span class="added">${optimized}</span></div>`;
-            }
-            // 处理删除模式: "-A" 或 "删除A"
-            else if (diff.startsWith('-') || diff.includes('删除')) {
-              const deletedText = diff.startsWith('-') ? diff.substring(1).trim() : diff.replace(/删除/g, '').trim();
-              return `<div class="diff-item">${index + 1}. <span class="deleted">${deletedText}</span></div>`;
-            }
-            // 处理添加模式: "+A" 或 "添加A"
-            else if (diff.startsWith('+') || diff.includes('添加')) {
-              const addedText = diff.startsWith('+') ? diff.substring(1).trim() : diff.replace(/添加/g, '').trim();
-              return `<div class="diff-item">${index + 1}. <span class="added">+${addedText}</span></div>`;
-            }
-            // 其他情况直接显示
-            return `<div class="diff-item">${index + 1}. <span>${diff}</span></div>`;
-          }
-          // 其他意外情况，返回原始内容
-          return `<div class="diff-item">${index + 1}. <span>${JSON.stringify(diff)}</span></div>`;
-        }).join('');
+          return ''; // 忽略其他格式
+        }).filter(Boolean).join('');
       }
       
-      // 简单显示原文和优化文本的差异
-      return `<div class="diff-item"><span class="deleted">${optimizedItem.value.originalText}</span> → <span class="added">${optimizedItem.value.text}</span></div>`;
+      return '';
     });
-    
     // 获取高亮后的优化文本
     const getHighlightedText = (optimizedItem) => {
-      if (!optimizedItem || !optimizedItem.text || !optimizedItem.diff || optimizedItem.diff.length === 0) {
+      if (!optimizedItem || !optimizedItem?.text || !optimizedItem?.diff || optimizedItem?.diff?.length === 0) {
         return optimizedItem?.text || '';
       }
       
-      let text = optimizedItem.text;
+      let text = optimizedItem?.text;
       const highlightWords = [];
       
       // 收集所有需要高亮的文本
-      optimizedItem.diff.forEach(diff => {
-        // 处理新的JSON格式
-        if (diff.originText !== undefined && diff.replacedText !== undefined) {
-          // 只对替换和新增的文本进行高亮处理
-          if (diff.replacedText) {
-            highlightWords.push(diff.replacedText);
-          }
-        }
-        // 兼容旧格式
-        else if (typeof diff === 'string') {
-          if (diff.includes('→')) {
-            // 处理替换情况，提取箭头右边的内容
-            const parts = diff.split('→');
-            if (parts.length === 2) {
-              const optimized = parts[1].trim();
-              // 检查是否是新增格式
-              if (optimized.startsWith('【') && optimized.endsWith('】')) {
-                // 提取【】中的内容
-                const addedText = optimized.substring(1, optimized.length - 1);
-                highlightWords.push(addedText);
-              } else if (optimized) {
-                highlightWords.push(optimized);
-              }
-            }
-          } else if (diff.startsWith('+') || diff.includes('添加')) {
-            // 处理添加模式
-            const addedText = diff.startsWith('+') ? diff.substring(1).trim() : diff.replace(/添加/g, '').trim();
-            highlightWords.push(addedText);
-          } else if (diff.includes('【') && diff.includes('】')) {
-            // 提取所有【】括起来的内容
-            const regex = /【([^【】]+)】/g;
-            let match;
-            while ((match = regex.exec(diff)) !== null) {
-              highlightWords.push(match[1]);
-            }
+      optimizedItem?.diff?.forEach(diff => {
+        // 只处理JSON格式
+        if (diff?.originText !== undefined && diff?.replacedText !== undefined) {
+          // 只对替换后的文本进行高亮处理
+          if (diff?.replacedText) {
+            highlightWords.push(diff?.replacedText);
           }
         }
       });
@@ -271,12 +218,12 @@ export default {
         originalStylesMap.value.delete(originalItem.value.id);
       }
       
-      if (optimizedItem.value) {
+      if (optimizedItem?.value) {
         optimizedItem.value = { ...optimizedItem.value, replaced: true };
       }
       
-      if (originalItem.value) {
-        replacedItems.value.add(originalItem.value.id);
+      if (originalItem?.value) {
+        replacedItems.value.add(originalItem?.value?.id);
       }
       
       // 延时关闭结果页面
@@ -293,190 +240,160 @@ export default {
       }
       isActive.value = false;
       
-      // 替换文档中的内容
-      let replaced = false;
-      
-      try {
-        // 获取当前选中文本
-        const selection = window.Application.Selection;
-        if (!selection) {
-          throw new Error('无法获取选中文本');
-        }
-        
-        // 记录选择的范围信息
-        const selectionStart = selection.Range.Start;
-        const selectionEnd = selection.Range.End;
-        
-        // 获取原始XML
-        const xml = selection.Range.WordOpenXML;
-        
-        // 替换XML中的文本
-        const newXml = replaceSelectionXml(xml, originalTextItem.text, optimizedTextItem.text);
-        
-        // 插入修改后的XML
-        selection.Range.InsertXML(newXml);
-        replaced = true;
-
-        if (replaced) {
-          // 更新状态
-          if (optimizedItem.value) {
-            optimizedItem.value = { ...optimizedItem.value, replaced: true };
-          }
-
-          replacedItems.value.add(originalTextItem.id);
-          originalStylesMap.value.delete(originalTextItem.id);
-          
-          // 同步文档
-          window.Application.ActiveDocument.Sync.PutUpdate();
-          
-          // 强制触发UI更新
-          window.Application.ActiveDocument.Range(0, 0).Select();
-          
-          // 尝试重新选中相同的范围区域
-          try {
-            const doc = window.Application.ActiveDocument;
-            doc.Range(selectionStart, selectionEnd).Select();
-          } catch (e) {
-            console.warn('无法重新选中原文本区域:', e);
-          }
-          
-          // 替换后延时关闭结果页面
-          setTimeout(() => {
-            showResults.value = false;
-          }, 500);
-        } else {
-          // 更新状态，不使用alert
-          optimizedItem.value = {
-            ...optimizedItem.value,
-            replaced: true,
-            notImprove: true
-          };
-          setTimeout(() => {
-            showResults.value = false;
-          }, 500);
-        }
-      } catch (error) {
-        console.error('替换内容时出错:', error);
-        // 更新状态，不使用alert
-        optimizedItem.value = {
-          ...optimizedItem.value,
-          replaced: true,
-          notImprove: true
-        };
-        setTimeout(() => {
-          showResults.value = false;
-        }, 500);
+      // 获取当前选中文本
+      const selection = window.Application.Selection;
+      if (!selection) {
+        console.error('无法获取选中文本');
+        return;
       }
+      
+      // 记录选择的范围信息
+      const selectionStart = selection.Range.Start;
+      const selectionEnd = selection.Range.End;
+      
+      // 获取原始XML
+      const xml = selection.Range.WordOpenXML;
+      if (!xml) {
+        console.error('无法获取XML内容');
+        return;
+      }
+      
+      // 替换XML中的文本
+      const newXml = replaceSelectionXml(xml, originalTextItem.text, optimizedTextItem.text);
+      
+      // 插入修改后的XML
+      selection.Range.InsertXML(newXml);
+      
+      // 更新状态
+      if (optimizedItem?.value) {
+        optimizedItem.value = { ...optimizedItem.value, replaced: true };
+      }
+
+      replacedItems.value.add(originalTextItem.id);
+      originalStylesMap.value.delete(originalTextItem.id);
+      
+      // 同步文档
+      window.Application.ActiveDocument.Sync.PutUpdate();
+      
+      // 强制触发UI更新
+      window.Application.ActiveDocument.Range(0, 0).Select();
+      
+      // 尝试重新选中相同的范围区域
+      try {
+        const doc = window.Application.ActiveDocument;
+        doc.Range(selectionStart, selectionEnd).Select();
+      } catch (e) {
+        console.error('无法重新选中原文本区域:', e);
+      }
+      
+      // 替换后延时关闭结果页面
+      setTimeout(() => {
+        showResults.value = false;
+      }, 500);
     };
     
     // 替换选中文本的XML
     const replaceSelectionXml = (xml, originalText, optimizedText) => {
-      try {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xml, "text/xml");
-        
-        // 获取所有w:t标签
-        const textNodes = xmlDoc.getElementsByTagName("w:t");
-        
-        // 提取所有文本内容
-        let combinedText = '';
-        for (let i = 0; i < textNodes.length; i++) {
-          combinedText += textNodes[i].textContent;
-        }
-        
-        // 验证提取的文本是否匹配原始文本
-        if (combinedText.trim() !== originalText.trim()) {
-          console.warn(`提取的文本与预期不符: "${combinedText}" vs "${originalText}"`);
-        }
-        
-        // 根据节点长度比例分配新文本
-        let remainingText = optimizedText;
-        const totalLength = combinedText.length;
-        
-        if (totalLength === 0) {
-          return xml;
-        }
-        
-        for (let i = 0; i < textNodes.length; i++) {
-          const nodeText = textNodes[i].textContent;
-          const nodeRatio = nodeText.length / totalLength;
-          
-          if (i === textNodes.length - 1) {
-            // 最后一个节点处理所有剩余文本
-            textNodes[i].textContent = remainingText;
-          } else {
-            // 按原始比例分配文本
-            const allocatedLength = Math.floor(optimizedText.length * nodeRatio);
-            const nodeTextLength = Math.max(1, allocatedLength);
-            textNodes[i].textContent = remainingText.substring(0, nodeTextLength);
-            remainingText = remainingText.substring(nodeTextLength);
-          }
-        }
-        
-        // 将修改后的XML序列化回字符串
-        const serializer = new XMLSerializer();
-        return serializer.serializeToString(xmlDoc);
-      } catch (error) {
-        console.error('替换XML内容时出错:', error);
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xml, "text/xml");
+      
+      // 检查XML解析是否成功
+      if (!xmlDoc || xmlDoc.getElementsByTagName("parsererror").length > 0) {
+        console.error('XML解析失败');
         return xml;
       }
+      
+      // 获取所有w:t标签
+      const textNodes = xmlDoc.getElementsByTagName("w:t");
+      
+      if (!textNodes || textNodes.length === 0) {
+        console.error('未找到有效的文本节点');
+        return xml;
+      }
+      
+      // 提取所有文本内容
+      let combinedText = '';
+      for (let i = 0; i < textNodes.length; i++) {
+        combinedText += textNodes[i].textContent || '';
+      }
+      
+      // 验证提取的文本是否匹配原始文本
+      if (combinedText.trim() !== originalText.trim()) {
+        console.warn(`提取的文本与预期不符: "${combinedText}" vs "${originalText}"`);
+        // 非严格模式，继续执行
+      }
+      
+      // 根据节点长度比例分配新文本
+      let remainingText = optimizedText;
+      const totalLength = combinedText.length;
+      
+      if (totalLength === 0) {
+        console.error('获取到的文本长度为0');
+        return xml;
+      }
+      
+      for (let i = 0; i < textNodes.length; i++) {
+        const nodeText = textNodes[i].textContent || '';
+        const nodeRatio = nodeText.length / totalLength;
+        
+        if (i === textNodes.length - 1) {
+          // 最后一个节点处理所有剩余文本
+          textNodes[i].textContent = remainingText;
+        } else {
+          // 按原始比例分配文本
+          const allocatedLength = Math.floor(optimizedText.length * nodeRatio);
+          const nodeTextLength = Math.max(1, allocatedLength);
+          
+          // 确保不超出剩余文本长度
+          if (nodeTextLength <= remainingText.length) {
+            textNodes[i].textContent = remainingText.substring(0, nodeTextLength);
+            remainingText = remainingText.substring(nodeTextLength);
+          } else {
+            // 如果剩余文本不足，使用所有剩余文本
+            textNodes[i].textContent = remainingText;
+            remainingText = '';
+          }
+        }
+      }
+      
+      // 将修改后的XML序列化回字符串
+      const serializer = new XMLSerializer();
+      return serializer.serializeToString(xmlDoc);
     };
     
     // 收集选中文本的样式信息
     const collectOriginalStyle = (paragraphId) => {
-      try {
-        const selection = window.Application.Selection;
-        if (selection) {
-          const underlineStyle = selection.Font.Underline === 9999999 ? 0 : selection.Font.Underline;
-          const colorStyle = selection.Font.Color === 9999999 ? 0 : selection.Font.Color;
-          
-          // 只记录原始样式，不修改样式
-          originalStylesMap.value.set(paragraphId, {
-            underline: underlineStyle,
-            color: colorStyle
-          });
-          
-          // 不需要对文本高亮处理
-          
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('收集原始样式时出错:', error);
+      if (!window.Application?.Selection) {
         return false;
       }
+      
+      const selection = window.Application.Selection;
+      const underlineStyle = selection.Font.Underline === 9999999 ? 0 : selection.Font.Underline;
+      const colorStyle = selection.Font.Color === 9999999 ? 0 : selection.Font.Color;
+      
+      // 只记录原始样式，不修改样式
+      originalStylesMap.value.set(paragraphId, {
+        underline: underlineStyle,
+        color: colorStyle
+      });
+      
+      return true;
     };
     
     // 检查当前选中的文本
     const checkSelectionText = () => {
-      try {
-        if (!window.Application || !window.Application.Selection) {
-          return;
-        }
-        
-        const selection = window.Application.Selection;
-        const newText = selection.Text.trim();
-        
-        // 如果选中的文本发生了变化且不为空
-        if (newText && currentSelectionText.value !== newText && !loading.value) {
-          // 显示提示信息
-          if (showResults.value) {
-            // 更新提示信息
-            errorMessage.value = '检测到选中文本已变化，将重新优化';
-            
-            // 2秒后自动开始新的优化流程
-            setTimeout(() => {
-              currentSelectionText.value = newText;
-              goBack();
-            }, 2000);
-          } else {
-            // 直接更新当前文本并开始优化
-            currentSelectionText.value = newText;
-            handleStartProcess();
-          }
-        }
-      } catch (error) {
-        console.error('检查文本选择时出错:', error);
+      if (!window.Application?.Selection) {
+        return;
+      }
+      
+      const selection = window.Application.Selection;
+      const newText = selection.Text.trim();
+      
+      // 如果选中的文本发生了变化且不为空
+      if (newText && currentSelectionText.value !== newText && !loading.value) {
+        // 记录新文本并显示变化提示
+        newSelectionText.value = newText;
+        textChangeDetected.value = true;
       }
     };
     
@@ -494,21 +411,19 @@ export default {
     const handleStartProcess = async () => {
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
-
       loading.value = true;
 
       if (!isWordDocument()) {
-        // 当没有打开文档时，需要使用alert提示
         alert('无法访问Word文档，请确保文档已打开');
         loading.value = false;
         return;
       }
 
       processingStatus.value = '正在提取选中内容...';
+      
       const selection = window.Application.Selection;
       
-      if (!selection || selection.Text.trim() === '') {
-        // 当没有选中段落时，需要使用alert提示
+      if (!selection || !selection.Text || selection.Text.trim() === '') {
         alert('无法获取选中内容，请确保已选中文本');
         loading.value = false;
         return;
@@ -516,7 +431,7 @@ export default {
       
       // 直接从选中内容获取文本
       const selectedText = {
-        id: selection.Paragraphs.Item(1).ParaID, // 获取第一个段落的ID
+        id: selection.Paragraphs && selection.Paragraphs.Item(1) ? selection.Paragraphs.Item(1).ParaID : 'selection-' + Date.now(),
         text: selection.Text.trim()
       };
       
@@ -535,32 +450,32 @@ export default {
       
       processingStatus.value = '正在优化内容...';
 
+      // 准备用于API的数据格式
+      const dataForDeepseek = {
+        paraID: selectedText.id,
+        text: selectedText.text
+      };
+      
+      // 重置错误消息
+      errorMessage.value = '';
+      
+      // 调用API进行优化
+      const params = {
+        messages: [
+          {
+            role: "system",
+            content: "你是一个专业的文章优化助手。请仅对文本进行词语级别的精确替换和优化，保持原文结构和主要内容不变。替换时尽量一对一替换词语，不要添加新内容，不要重写整个句子。如果判断文本不需要优化，请保持原样。你的目标是使优化后的文本与原文有最小的差异，但提高表达质量。"
+          },
+          {
+            role: "user",
+            content: `请对以下JSON格式内容进行词语级别的优化，返回优化后相同格式的JSON。仅替换需要改进的个别词语，保持整体结构不变：\n\n${JSON.stringify(dataForDeepseek)}`
+          }
+        ],
+        model: "qwen-plus",
+        signal: cancelTokenRef.value?.signal
+      };
+      
       try {
-        // 准备用于API的数据格式
-        const dataForDeepseek = {
-          paraID: selectedText.id,
-          text: selectedText.text
-        };
-        
-        // 重置错误消息
-        errorMessage.value = '';
-        
-        // 调用API进行优化
-        const params = {
-          messages: [
-            {
-              role: "system",
-              content: "你是一个专业的文章优化助手。请仅对文本进行词语替换和优化，不要添加大量新文本。如果判断文本不需要优化，请保持原样。"
-            },
-            {
-              role: "user",
-              content: `请对以下JSON格式内容进行优化，返回优化后相同格式的JSON：\n\n${JSON.stringify(dataForDeepseek)}`
-            }
-          ],
-          model: "qwen-plus",
-          signal: cancelTokenRef.value?.signal
-        };
-        
         const response = await retryOptimization(params);
         
         if (!processingRef.value) {
@@ -568,130 +483,97 @@ export default {
           return;
         }
         
-        if (response.data && response.data.choices && response.data.choices.length > 0) {
-          const result = response.data.choices[0].message.content;
-          
-          try {
-            // 解析API返回的结果
-            let jsonData;
-            const jsonMatch = result.match(/(\{.*\})/s);
-            if (jsonMatch) {
-              jsonData = JSON.parse(jsonMatch[1]);
-            } else {
-              jsonData = JSON.parse(result);
-            }
-            
-            // 检查返回的数据
-            if (jsonData && jsonData.paraID && jsonData.text) {
-              // 检查文本是否有变化
-              const hasChanges = selectedText.text.trim() !== jsonData.text.trim();
-              
-              // 生成优化结果
-              optimizedItem.value = {
-                id: selectedText.id,
-                originalText: selectedText.text,
-                text: jsonData.text,
-                notImprove: !hasChanges,
-                diff: [],
-                replaced: false
-              };
-              
-              // 如果没有变化，不需要获取差异分析
-              if (hasChanges) {
-                try {
-                  // 设置超时，确保差异分析不会无限等待
-                  const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('差异分析超时')), 10000);
-                  });
-                  
-                  // 创建差异分析请求
-                  const diffAnalysisPromise = generateDiffAnalysis({
-                    original: selectedText.text,
-                    optimized: jsonData.text,
-                    signal: cancelTokenRef.value?.signal
-                  });
-                  
-                  // 使用Promise.race确保有超时保护
-                  const diffResponse = await Promise.race([
-                    diffAnalysisPromise,
-                    timeoutPromise
-                  ]);
-                  
-                  if (diffResponse.data && diffResponse.data.choices && diffResponse.data.choices.length > 0) {
-                    const diffResult = diffResponse.data.choices[0].message.content;
-                    try {
-                      // 处理返回的差异分析结果
-                      const jsonStart = diffResult.indexOf('[');
-                      const jsonEnd = diffResult.lastIndexOf(']') + 1;
-                      if (jsonStart !== -1 && jsonEnd !== -1) {
-                        const jsonStr = diffResult.substring(jsonStart, jsonEnd);
-                        const diffArray = JSON.parse(jsonStr);
-                        if (Array.isArray(diffArray)) {
-                          optimizedItem.value.diff = diffArray;
-                        }
-                      } else {
-                        // 尝试直接解析全文
-                        const diffArray = JSON.parse(diffResult);
-                        if (Array.isArray(diffArray)) {
-                          optimizedItem.value.diff = diffArray;
-                        }
-                      }
-                    } catch (e) {
-                      console.error('解析差异分析失败:', e);
-                      
-                      // 如果解析失败，尝试手动创建差异标记
-                      optimizedItem.value.diff = [
-                        `${selectedText.text} → ${jsonData.text}`
-                      ];
-                    }
-                  } else {
-                    // 如果没有获取到差异分析结果，手动创建一个简单的差异标记
-                    optimizedItem.value.diff = [
-                      `${selectedText.text} → ${jsonData.text}`
-                    ];
-                  }
-                } catch (e) {
-                  console.error('获取差异分析失败:', e);
-                  
-                  // 即使差异分析失败，也创建一个简单的差异标记
-                  optimizedItem.value.diff = [
-                    `${selectedText.text} → ${jsonData.text}`
-                  ];
-                } finally {
-                  // 无论差异分析是否成功，都继续显示结果
-                  showResults.value = true;
-                  loading.value = false;
-                }
-              } else {
-                // 没有变化，直接显示结果
-                showResults.value = true;
-                loading.value = false;
-              }
-            } else {
-              console.error('API返回的数据格式不正确');
-              loading.value = false;
-              showResults.value = true; // 即使格式不正确也显示结果
-            }
-          } catch (error) {
-            console.error('解析优化结果失败:', error);
-            loading.value = false;
-            showResults.value = true; // 即使解析失败也显示结果
-          }
-        } else {
-          console.error('API返回的数据格式不正确');
+        if (!response?.data?.choices?.length) {
+          errorMessage.value = 'API返回的数据格式不正确或为空';
           loading.value = false;
-          showResults.value = true; // 即使API返回为空也显示结果
+          showResults.value = true;
+          return;
         }
+        
+        const result = response.data.choices[0].message.content;
+        
+        // 解析API返回的结果
+        let jsonData;
+        const jsonMatch = result.match(/(\{.*\})/s);
+        
+        if (jsonMatch) {
+          jsonData = JSON.parse(jsonMatch[1]);
+        } else {
+          jsonData = JSON.parse(result);
+        }
+        
+        // 检查返回的数据
+        if (!jsonData?.paraID || !jsonData?.text) {
+          errorMessage.value = 'API返回的数据格式不正确';
+          loading.value = false;
+          showResults.value = true;
+          return;
+        }
+        
+        // 检查文本是否有变化
+        const hasChanges = selectedText.text.trim() !== jsonData.text.trim();
+        
+        // 生成优化结果
+        optimizedItem.value = {
+          id: selectedText.id,
+          originalText: selectedText.text,
+          text: jsonData.text,
+          notImprove: !hasChanges,
+          diff: [],
+          replaced: false
+        };
+        
+        // 如果没有变化，不需要获取差异分析
+        if (!hasChanges) {
+          showResults.value = true;
+          loading.value = false;
+          return;
+        }
+        
+        // 获取差异分析
+        try {
+          // 创建差异分析请求
+          const diffResponse = await generateDiffAnalysis({
+            original: selectedText.text,
+            optimized: jsonData.text,
+            signal: cancelTokenRef.value?.signal
+          });
+          localStorage.setItem('diffResponse', JSON.stringify(diffResponse));
+          if (diffResponse?.data?.choices?.length) {
+            const diffResult = diffResponse.data.choices[0].message.content;
+            const diffArray = JSON.parse(diffResult);
+            optimizedItem.value.diff = Array.isArray(diffArray) ? diffArray : [];
+          }
+        } catch (e) {
+          console.error('获取差异分析失败:', e);
+          optimizedItem.value.diff = [];
+        }
+        
+        showResults.value = true;
       } catch (error) {
         console.error('处理失败:', error);
-        loading.value = false;
-        errorMessage.value = '处理失败，请重试'; // 设置错误消息
-        showResults.value = true; // 即使处理失败也显示结果
+        errorMessage.value = `处理失败: ${error.message || '未知错误'}`;
       } finally {
-        // 确保处理完成后，不论成功失败都关闭加载状态
         processingStatus.value = '';
         processingRef.value = false;
         loading.value = false;
+        showResults.value = true;
+      }
+    };
+    
+    // 忽略文本变化
+    const ignoreTextChange = () => {
+      textChangeDetected.value = false;
+      newSelectionText.value = '';
+    };
+    
+    // 处理重新优化
+    const handleReOptimize = () => {
+      if (newSelectionText.value) {
+        currentSelectionText.value = newSelectionText.value;
+        textChangeDetected.value = false;
+        showResults.value = false;
+        handleStartProcess();
       }
     };
     
@@ -731,7 +613,10 @@ export default {
       handleIgnoreItem,
       goBack,
       errorMessage,
-      getHighlightedText
+      getHighlightedText,
+      textChangeDetected,
+      handleReOptimize,
+      ignoreTextChange
     };
   }
 };
@@ -748,6 +633,44 @@ export default {
   background-color: #f0f2f5;
   color: #333;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 文本变化提示样式 */
+.text-change-alert {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: #fffbe6;
+  border: 1px solid #ffe58f;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.text-change-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.text-change-action {
+  cursor: pointer;
+  color: #1890ff;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.text-change-action:hover {
+  background-color: rgba(24, 144, 255, 0.1);
+}
+
+.text-change-action.ignore {
+  color: #999;
 }
 
 .loading-container {
