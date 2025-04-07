@@ -11,13 +11,11 @@ import apiClient from '../services/request';
 
 // 提交优化请求
 export const submitOptimization = (params) => {
-  return apiClient.post('/api/wps/chat', {
-    payload: {
+  return apiClient.post('/v1/chat/completions', {
       messages: params.messages,
       model: "qwen-plus",
       stream: false,
       max_tokens: 8192,
-    }
   }, {
     signal: params.signal 
   });
@@ -25,8 +23,7 @@ export const submitOptimization = (params) => {
 
 // 生成文本差异分析
 export const generateDiffAnalysis = (params) => {
-  return apiClient.post('/api/wps/chat', {
-    payload: {
+  return apiClient.post('/v1/chat/completions', {
       messages: [
         {
           role: "system",
@@ -41,7 +38,6 @@ export const generateDiffAnalysis = (params) => {
       stream: false,
       max_tokens: 2048,
       temperature: 0.2,
-    }
   }, {
     signal: params.signal
   });

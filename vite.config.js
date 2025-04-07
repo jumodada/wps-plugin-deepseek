@@ -17,13 +17,13 @@ export default defineConfig(({ mode }) => {
     server: {
       host:'0.0.0.0',
       cors: true,
-      proxy: {
-        '/v1': {
-          target: env.VITE_DEEPSEEK_API_BASEURL,
-          changeOrigin: true,
-          rewrite: (path) => path,
-        },
-      }
+      // proxy: {
+      //   '/v1': {
+      //     target: env.VITE_DEEPSEEK_API_BASEURL,
+      //     changeOrigin: true,
+      //     rewrite: (path) => path,
+      //   },
+      // }
     },
     css: {
       preprocessorOptions: {
