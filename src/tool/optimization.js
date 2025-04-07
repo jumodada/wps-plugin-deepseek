@@ -213,7 +213,7 @@ export const retryOptimization = async (params, maxRetries = 3) => {
         try {
             return await submitOptimization(params);
         } catch (error) {
-            if (error.name === 'AbortError' || error.name === 'CanceledError') {
+            if (error?.name === 'AbortError' || error?.name === 'CanceledError') {
                 throw error;
             }
             

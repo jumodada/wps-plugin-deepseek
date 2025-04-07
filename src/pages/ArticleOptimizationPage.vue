@@ -459,7 +459,7 @@ export default {
     // 监听文档名称变化
     const checkDocumentName = () => {
       if (isWordDocument()) {
-        const currentDocName = window.Application.ActiveDocument?.Name;
+        const currentDocName = window.Application?.ActiveDocument?.Name;
         if (activeDocumentName.value !== currentDocName) {
           activeDocumentName.value = currentDocName;
           if (activeDocumentName.value !== null) { // 不是首次设置才重新处理
@@ -474,7 +474,7 @@ export default {
     onMounted(() => {
       // 初始设置文档名
       if (isWordDocument()) {
-        activeDocumentName.value = window.Application.ActiveDocument?.Name;
+        activeDocumentName.value = window.Application?.ActiveDocument?.Name;
       }
       
       // 设置定时检查
