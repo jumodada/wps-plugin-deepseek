@@ -18,9 +18,14 @@ const router = createRouter({
       component: () => import('../pages/SelectionOptimizationPage.vue')
     },
     {
-      path: '/task-pane',
+      path: '/article-format',
       name: '文章格式化',
       component: () => import('../pages/ArticleFormatPage.vue')
+    },
+    {
+      path: '/word-correction',
+      name: '文章词语纠错',
+      component: () => import('../pages/WordCorrectionPage.vue')
     },
   ]
 })

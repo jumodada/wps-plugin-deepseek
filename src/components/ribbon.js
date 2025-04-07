@@ -26,7 +26,7 @@ function GetUrl() {
 
 // 关闭所有任务面板
 function closeAllTaskPanes() {
-    const paneIds = ['all_article_pane_id', 'task_pane_id', 'selection_pane_id'];
+    const paneIds = ['article_optimization_id', 'article_format_id', 'selection_pane_id', 'word_correction_id'];
     paneIds.forEach(id => {
         const tsId = window.Application.PluginStorage.getItem(id);
         if (tsId) {
@@ -43,38 +43,16 @@ function closeAllTaskPanes() {
 }
 
 const xmlNavbarButtons = {
-    allArticleOptimization: {
-        id: 'allArticleOptimization',
-        label: '文档预览',
-        image: 'images/1.svg',
-        onAction: () => {
-            const tsId = window.Application.PluginStorage.getItem('all_article_pane_id');
-            if (!tsId) {
-                closeAllTaskPanes();
-                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + '/all-article-optimization');
-                window.Application.PluginStorage.setItem('all_article_pane_id', taskPane.ID);
-                taskPane.Visible = true;
-            } else {
-                const taskPane = window.Application.GetTaskPane(tsId);
-                if (taskPane.Visible) {
-                    taskPane.Visible = false;
-                } else {
-                    closeAllTaskPanes();
-                    taskPane.Visible = true;
-                }
-            }
-        }
-    },
     articleOptimization: {
         id: 'articleOptimization',
         label: '文章优化',
         image: 'images/1.svg',
         onAction: () => {
-            const tsId = window.Application.PluginStorage.getItem('task_pane_id');
+            const tsId = window.Application.PluginStorage.getItem('article_optimization_id');
             if (!tsId) {
                 closeAllTaskPanes();
                 const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/article-optimization');
-                window.Application.PluginStorage.setItem('task_pane_id', taskPane.ID);
+                window.Application.PluginStorage.setItem('article_optimization_id', taskPane.ID);
                 taskPane.Visible = true;
             } else {
                 const taskPane = window.Application.GetTaskPane(tsId);
@@ -120,30 +98,16 @@ const xmlNavbarButtons = {
             }
         }
     },
-    showDialog: {
-        id: 'showDialog',
-        label: '显示对话框',
-        image: 'images/2.svg',
-        onAction: () => {
-            window.Application.ShowDialog(
-                GetUrl() + '/dialog',
-                '这是一个对话框网页',
-                400 * window.devicePixelRatio,
-                400 * window.devicePixelRatio,
-                false
-            );
-        }
-    },
-    showTaskPane: {
-        id: 'showTaskPane',
+    articleFormat: {
+        id: 'articleFormat',
         label: '文章格式化',
         image: 'images/3.svg',
         onAction: () => {
-            const tsId = window.Application.PluginStorage.getItem('task_pane_id');
+            const tsId = window.Application.PluginStorage.getItem('article_format_id');
             if (!tsId) {
                 closeAllTaskPanes();
-                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/task-pane');
-                window.Application.PluginStorage.setItem('task_pane_id', taskPane.ID);
+                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/article-format');
+                window.Application.PluginStorage.setItem('article_format_id', taskPane.ID);
                 taskPane.Visible = true;
             } else {
                 const taskPane = window.Application.GetTaskPane(tsId);
@@ -156,20 +120,26 @@ const xmlNavbarButtons = {
             }
         }
     },
-    onNewDocumentEvent: {
-        id: 'onNewDocumentEvent',
-        label: '动态监听新建文件',
-        image: 'images/newFormTemp.svg',
+    wordCorrection: {
+        id: 'wordCorrection',
+        label: '文章词语纠错',
+        image: 'images/1.svg',
         onAction: () => {
-            const bFlag = window.Application.PluginStorage.getItem('ApiEventFlag');
-            const bRegister = !bFlag;
-            window.Application.PluginStorage.setItem('ApiEventFlag', bRegister);
-            if (bRegister) {
-                window.Application.ApiEvent.AddApiEventListener('DocumentNew', 'ribbon.OnNewDocumentApiEvent');
+            const tsId = window.Application.PluginStorage.getItem('word_correction_id');
+            if (!tsId) {
+                closeAllTaskPanes();
+                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/word-correction');
+                window.Application.PluginStorage.setItem('word_correction_id', taskPane.ID);
+                taskPane.Visible = true;
             } else {
-                window.Application.ApiEvent.RemoveApiEventListener('DocumentNew', 'ribbon.OnNewDocumentApiEvent');
+                const taskPane = window.Application.GetTaskPane(tsId);
+                if (taskPane.Visible) {
+                    taskPane.Visible = false;
+                } else {
+                    closeAllTaskPanes();
+                    taskPane.Visible = true;
+                }
             }
-            window.Application.ribbonUI.InvalidateControl('btnApiEvent');
         }
     }
 };
