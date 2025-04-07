@@ -11,13 +11,9 @@
         <div class="result-card">
           <p>{{ replacedItems.size > 0 ? '所有错误词语已成功修正' : '没有检测到需要纠正的词语' }}</p>
           <div class="empty-actions">
-            <span class="retry-link" @click="handleStartProcess">
+            <span class="retry-link" @click="handleStartProcess()">
               <span class="icon">↻</span>
               重新检测
-            </span>
-            <span class="back-link" @click="goBack">
-              <span class="icon">←</span>
-              返回
             </span>
           </div>
         </div>
@@ -71,13 +67,9 @@
         
         <!-- 底部返回按钮 -->
         <div class="bottom-actions">
-          <span class="retry-link" @click="handleStartProcess">
+          <span class="retry-link" @click="handleStartProcess()">
             <span class="icon">↻</span>
             重新检测
-          </span>
-          <span class="back-link" @click="goBack">
-            <span class="icon">←</span>
-            返回
           </span>
         </div>
       </div>
@@ -171,14 +163,6 @@ export default {
           restoreOriginalStyle(paragraphId);
         });
       }
-    };
-
-    // 处理返回操作
-    const goBack = () => {
-      restoreOriginalStyle();
-      activeCardId.value = null;
-      showResults.value = false;
-      handleStartProcess();
     };
     
     // 处理忽略项目
@@ -394,6 +378,12 @@ export default {
     
     // 启动处理流程
     const handleStartProcess = async () => {
+      // 先执行返回操作的功能
+      restoreOriginalStyle();
+      activeCardId.value = null;
+      showResults.value = false;
+
+      // 然后执行原有的处理流程
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
@@ -510,8 +500,8 @@ export default {
       handleLocateInDocument,
       handleReplaceItem,
       handleIgnoreItem,
-      goBack,
-      cardRefs
+      cardRefs,
+      handleStartProcess
     };
   }
 };
@@ -602,13 +592,6 @@ export default {
 
 .icon {
   margin-right: 5px;
-}
-
-.back-link {
-  cursor: pointer;
-  color: #999;
-  font-size: 15px;
-  display: inline-block;
 }
 
 .results-list {
