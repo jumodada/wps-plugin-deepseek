@@ -1,8 +1,14 @@
 <template>
   <div class="correction-container">
-    <div v-if="loading" class="loading-container">
-      <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
-      <div class="spinner"></div>
+    <div v-if="loading" class="overlay-container">
+      <div class="progress-container">
+        <p class="processing-title">文档处理中</p>
+        <div class="progress-bar">
+          <div class="progress-inner" :style="{ width: `${progressPercentage}%` }"></div>
+        </div>
+        <p class="progress-percentage">{{ Math.round(progressPercentage) }}%</p>
+        <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
+      </div>
     </div>
     
     <div v-else-if="showResults" class="results-container">
@@ -106,6 +112,27 @@ export default {
     const processingRef = ref(false);
     const previousActiveCardId = ref(null);
     const cardRefs = ref({});
+    const processComplete = ref(false);
+    
+    // 批量处理相关的状态变量
+    const batchSize = ref(5); // 每批处理的段落数量
+    const currentBatch = ref(0);
+    const totalBatches = ref(0);
+    const processedBatches = ref(0);
+    
+    // 进度条相关
+    const progress = ref(0);
+    const simulatedProgress = ref(0);
+    const progressInterval = ref(null);
+    
+    // 计算进度百分比
+    const progressPercentage = computed(() => {
+      if (totalBatches.value === 0) return 0;
+      // 真实进度 + 模拟进度
+      const realProgress = (processedBatches.value / totalBatches.value) * 100;
+      const simulated = simulatedProgress.value / totalBatches.value;
+      return Math.min(Math.max(realProgress + simulated, 0), 100);
+    });
     
     // 计算属性 - 过滤需要展示的数据
     const filteredData = computed(() => {
@@ -113,6 +140,33 @@ export default {
         return !replacedItems.value.has(item.id) && item.errorWord && item.correctedWord;
       });
     });
+    
+    // 启动模拟进度
+    const startProgressSimulation = () => {
+      // 清除之前的定时器
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+      }
+      
+      simulatedProgress.value = 0;
+      
+      // 设置新的定时器，每100ms增加一点模拟进度，使进度更平滑
+      progressInterval.value = setInterval(() => {
+        if (processedBatches.value < totalBatches.value) {
+          // 模拟进度增量，但确保不会超过下一个真实批次的进度
+          const maxSimulation = 0.95; // 最大模拟到下一批次的95%
+          const increment = 0.1; // 每次增加的进度更小，使过渡更平滑
+          
+          if (simulatedProgress.value < maxSimulation) {
+            simulatedProgress.value += increment;
+          }
+        } else {
+          // 处理完成，清除定时器
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+      }, 100);
+    };
     
     // 获取原始错误词语
     const getOriginalWord = (item) => {
@@ -382,14 +436,21 @@ export default {
       restoreOriginalStyle();
       activeCardId.value = null;
       showResults.value = false;
+      correctionData.value = [];
+      replacedItems.value = new Set();
+      processComplete.value = false;
 
       // 然后执行原有的处理流程
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
 
+      // 禁止页面滚动
+      document.body.style.overflow = 'hidden';
+
       if (!isWordDocument()) {
         loading.value = false;
+        document.body.style.overflow = '';
         return;
       }
 
@@ -403,32 +464,89 @@ export default {
       if (structuredData.length === 0) {
         message.warning('无法从文档中提取有效内容');
         loading.value = false;
+        document.body.style.overflow = '';
         return;
       }
 
       originalData.value = structuredData;
       processingStatus.value = `正在检查文档中的词语错误...`;
 
+      // 分批处理段落
+      const batches = [];
+      for (let i = 0; i < structuredData.length; i += batchSize.value) {
+        batches.push(structuredData.slice(i, i + batchSize.value));
+      }
+      
+      totalBatches.value = batches.length;
+      currentBatch.value = 0;
+      processedBatches.value = 0;
+      
+      // 启动进度模拟
+      startProgressSimulation();
+
       try {
-        // 调用词语纠错功能
-        // 在实际项目中，这里应该替换为真实的API调用
-        const correctionResults = await performWordCorrection(structuredData);
-        
-        correctionData.value = correctionResults;
-        
-        // 如果没有错误词语，显示提示
-        if (correctionResults.length === 0) {
-          message.success('文档中未发现词语错误');
-        } else {
-          message.success(`检测到 ${correctionResults.length} 处词语错误，请查看结果`);
+        // 逐批处理段落
+        for (let i = 0; i < batches.length; i++) {
+          if (!processingRef.value) {
+            break; // 如果处理被中断，跳出循环
+          }
+          
+          currentBatch.value = i + 1;
+          processingStatus.value = `正在检查词语错误... (${currentBatch.value}/${totalBatches.value})`;
+          
+          // 调用词语纠错功能
+          const batchCorrectionResults = await performWordCorrection(batches[i]);
+          
+          if (!processingRef.value) {
+            loading.value = false;
+            document.body.style.overflow = '';
+            return;
+          }
+          
+          // 合并批次结果
+          correctionData.value = [...correctionData.value, ...batchCorrectionResults];
+          
+          // 重置模拟进度，更新实际进度
+          simulatedProgress.value = 0;
+          processedBatches.value++;
         }
+        
+        // 所有批次处理完成
+        processComplete.value = true;
         
         // 显示结果
         showResults.value = true;
+        
+        // 如果没有错误词语，显示提示
+        if (correctionData.value.length === 0) {
+          message.success('文档中未发现词语错误');
+        } else {
+          message.success(`检测到 ${correctionData.value.length} 处词语错误，请查看结果`);
+        }
+        
+        // 清除进度模拟
+        if (progressInterval.value) {
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+        
         loading.value = false;
+        
+        // 恢复页面滚动
+        document.body.style.overflow = '';
       } catch (error) {
         console.error('处理失败:', error);
         loading.value = false;
+        
+        // 恢复页面滚动
+        document.body.style.overflow = '';
+        
+        // 清除进度模拟
+        if (progressInterval.value) {
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+        
         if (error.name !== 'AbortError') {
           message.error('处理失败，请重试');
         }
@@ -468,9 +586,18 @@ export default {
         clearInterval(intervalId);
       }
       
+      // 恢复页面滚动
+      document.body.style.overflow = '';
+      
       // 清理资源
       if (cancelTokenRef.value) {
         cancelTokenRef.value.abort();
+      }
+      
+      // 清除进度模拟
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+        progressInterval.value = null;
       }
       
       // 恢复所有样式
@@ -494,6 +621,7 @@ export default {
       replacedItems,
       activeCardId,
       filteredData,
+      progressPercentage,
       getOriginalWord,
       getCorrectedWord,
       getContextDisplay,
@@ -520,15 +648,69 @@ export default {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
+.overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(1px);
+}
+
+.progress-container {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 20px;
+  width: 80%;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.processing-title {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.progress-bar {
+  height: 10px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.progress-inner {
+  height: 100%;
+  background-color: #ff4d4f;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.processing-status {
+  margin-top: 15px;
+  color: #666;
+  font-size: 14px;
+}
+
 .loading-container {
   width: 100%;
   max-width: 500px;
   text-align: center;
-  color: #333;
-}
-
-.processing-status {
-  margin-bottom: 20px;
   color: #333;
 }
 
