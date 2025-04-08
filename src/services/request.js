@@ -63,6 +63,61 @@ apiClient.interceptors.response.use(
 );
 
 /**
+ * 处理流式响应
+ * @param {Response} response - 流式响应对象
+ * @param {Function} onData - 数据回调函数
+ * @param {Function} onError - 错误回调函数
+ * @param {Function} onComplete - 完成回调函数
+ */
+export function handleStreamResponse(response, onData, onError, onComplete) {
+  const reader = response.data.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  
+  function processStream() {
+    reader.read().then(({ done, value }) => {
+      if (done) {
+        if (onComplete) onComplete();
+        return;
+      }
+      
+      // 解码二进制数据
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      
+      // 处理SSE格式的数据
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // 保留最后一个不完整的行
+      
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        if (line.startsWith('data: ')) {
+          const data = line.substring(6);
+          if (data === '[DONE]') {
+            if (onComplete) onComplete();
+            return;
+          }
+          
+          try {
+            const parsedData = JSON.parse(data);
+            if (onData) onData(parsedData);
+          } catch (e) {
+            console.error('解析流式数据失败:', e);
+          }
+        }
+      }
+      
+      // 继续读取流
+      processStream();
+    }).catch(error => {
+      if (onError) onError(error);
+    });
+  }
+  
+  processStream();
+}
+
+/**
  * 获取数据的组合式函数
  * @param {string} url - 请求URL
  * @returns {Promise} - 返回请求Promise

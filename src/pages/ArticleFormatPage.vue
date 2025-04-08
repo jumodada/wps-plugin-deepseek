@@ -115,8 +115,9 @@
 <script>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { message } from 'ant-design-vue';
-import { submitOptimization } from '../api/deepseek';
+import { submitOptimization, submitStreamFormatting } from '../api/deepseek';
 import { isWordDocument } from '../tool/optimization';
+import { handleStreamResponse } from '../services/request';
 
 export default {
   name: 'ArticleFormatPage',
@@ -299,32 +300,95 @@ ${bodyContent}`
           }
         ];
         
-        // 调用AI接口处理格式化
-        const response = await submitOptimization({
-          messages: messages
+        // 创建取消令牌
+        const controller = new AbortController();
+        
+        // 调用流式AI接口处理格式化
+        const response = await submitStreamFormatting({
+          messages: messages,
+          signal: controller.signal
         });
         
-        if (!response.data || !response.data.choices || !response.data.choices.length) {
-          throw new Error('API返回结果无效');
+        // 用于存储完整的格式化结果
+        let formattedXML = '';
+        let isProcessing = true;
+        
+        // 处理流式响应
+        handleStreamResponse(
+          response,
+          // 数据回调
+          (data) => {
+            if (data.choices && data.choices.length > 0) {
+              const content = data.choices[0].delta?.content || '';
+              if (content) {
+                formattedXML += content;
+                // 更新处理状态
+                processingStatus.value = `正在处理格式化... (${formattedXML.length} 字符)`;
+              }
+            }
+          },
+          // 错误回调
+          (error) => {
+            console.error('流式处理出错:', error);
+            isProcessing = false;
+            message.error('格式化处理出错，请重试');
+            loading.value = false;
+            processingStatus.value = '';
+          },
+          // 完成回调
+          () => {
+            isProcessing = false;
+            if (!formattedXML) {
+              message.error('未获取到有效的格式化结果');
+              loading.value = false;
+              processingStatus.value = '';
+              return;
+            }
+            
+            processingStatus.value = '正在应用格式化结果...';
+            
+            try {
+              // 将格式化后的内容应用到文档
+              const doc = window.Application.ActiveDocument;
+              doc.Content.Text = ''; // 清空文档内容
+              doc.Content.InsertXML(formattedXML); // 插入格式化后的内容
+              
+              // 完成格式化
+              doc.Sync.PutUpdate();
+              message.success('文档格式化完成');
+            } catch (error) {
+              console.error('应用格式化结果时出错:', error);
+              message.error('应用格式化结果失败');
+            } finally {
+              loading.value = false;
+              processingStatus.value = '';
+            }
+          }
+        );
+        
+        // 添加取消按钮处理
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = '取消';
+        cancelButton.className = 'cancel-button';
+        cancelButton.onclick = () => {
+          controller.abort();
+          isProcessing = false;
+          loading.value = false;
+          processingStatus.value = '已取消';
+          setTimeout(() => {
+            processingStatus.value = '';
+          }, 2000);
+        };
+        
+        // 将取消按钮添加到处理状态下方
+        const statusContainer = document.querySelector('.processing-status');
+        if (statusContainer && statusContainer.parentNode) {
+          statusContainer.parentNode.appendChild(cancelButton);
         }
         
-        // 获取API返回的格式化后的XML内容
-        const formattedXML = response.data.choices[0].message.content.trim();
-        
-        processingStatus.value = '正在应用格式化结果...';
-        
-        // 将格式化后的内容应用到文档
-        const doc = window.Application.ActiveDocument;
-        doc.Content.Text = ''; // 清空文档内容
-        doc.Content.InsertXML(formattedXML); // 插入格式化后的内容
-        
-        // 完成格式化
-        doc.Sync.PutUpdate();
-        message.success('文档格式化完成');
       } catch (error) {
         console.error('格式化文档时出错:', error);
         message.error('格式化文档失败，请重试');
-      } finally {
         loading.value = false;
         processingStatus.value = '';
       }
@@ -404,6 +468,22 @@ ${bodyContent}`
   border-radius: 50%;
   border-top-color: #1890ff;
   animation: spin 1s ease-in-out infinite;
+}
+
+.cancel-button {
+  margin-top: 10px;
+  padding: 5px 15px;
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s;
+}
+
+.cancel-button:hover {
+  background-color: #ff7875;
 }
 
 @keyframes spin {

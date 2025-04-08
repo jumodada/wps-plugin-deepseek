@@ -21,6 +21,32 @@ export const submitOptimization = (params) => {
   });
 };
 
+// 流式提交优化请求
+export const submitStreamOptimization = (params) => {
+  return apiClient.post('/v1/chat/completions', {
+      messages: params.messages,
+      model: "qwen-plus",
+      stream: true,
+      max_tokens: 8192,
+  }, {
+    signal: params.signal,
+    responseType: 'stream'
+  });
+};
+
+// 流式文档格式化请求
+export const submitStreamFormatting = (params) => {
+  return apiClient.post('/v1/chat/completions', {
+      messages: params.messages,
+      model: "qwen-plus",
+      stream: true,
+      max_tokens: 8192,
+  }, {
+    signal: params.signal,
+    responseType: 'stream'
+  });
+};
+
 // 生成文本差异分析
 export const generateDiffAnalysis = (params) => {
   return apiClient.post('/v1/chat/completions', {
@@ -41,4 +67,47 @@ export const generateDiffAnalysis = (params) => {
   }, {
     signal: params.signal
   });
+};
+
+// 获取文档总token估算值
+export const getDocumentTokenEstimation = (documentContent) => {
+  // 一个粗略的估算：中文约每个字符1token，英文约每4个字符1token
+  const chineseCharCount = (documentContent.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const otherCharCount = documentContent.length - chineseCharCount;
+  
+  // 估算总token数
+  return chineseCharCount + Math.ceil(otherCharCount / 4);
+};
+
+// 处理流式响应内容
+export const parseStreamContent = (contentChunk) => {
+  try {
+    // 处理ID和数字格式（例如"4273"）
+    if (/^\d+$/.test(contentChunk)) {
+      return { type: 'id', content: contentChunk, tokenCount: 1 };
+    }
+    
+    // 处理带有"text"字段的格式
+    if (contentChunk.includes('"text":"')) {
+      const textMatch = contentChunk.match(/"text":"([^"]*)"/);
+      if (textMatch && textMatch[1]) {
+        const content = textMatch[1];
+        // 计算token数量
+        const chineseCharCount = (content.match(/[\u4e00-\u9fa5]/g) || []).length;
+        const otherCharCount = content.length - chineseCharCount;
+        const tokenCount = chineseCharCount + Math.ceil(otherCharCount / 4);
+        return { type: 'text', content, tokenCount };
+      }
+    }
+    
+    // 处理普通文本内容
+    const chineseCharCount = (contentChunk.match(/[\u4e00-\u9fa5]/g) || []).length;
+    const otherCharCount = contentChunk.length - chineseCharCount;
+    const tokenCount = chineseCharCount + Math.ceil(otherCharCount / 4);
+    
+    return { type: 'content', content: contentChunk, tokenCount };
+  } catch (error) {
+    console.error('解析流式内容失败:', error);
+    return { type: 'error', content: contentChunk, tokenCount: 1 };
+  }
 }; 

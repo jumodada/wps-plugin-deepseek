@@ -13,6 +13,11 @@ const router = createRouter({
       component: () => import('../pages/ArticleOptimizationPage.vue')
     },
     {
+      path: '/article-stream-optimization',
+      name: '全文优化(流式)',
+      component: () => import('../pages/ArticleStreamOptimizationPage.vue')
+    },
+    {
       path: '/selection-optimization',
       name: '选中文本优化',
       component: () => import('../pages/SelectionOptimizationPage.vue')

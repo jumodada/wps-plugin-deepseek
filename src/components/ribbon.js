@@ -26,7 +26,13 @@ function GetUrl() {
 
 // 关闭所有任务面板
 function closeAllTaskPanes() {
-    const paneIds = ['article_optimization_id', 'article_format_id', 'selection_pane_id', 'word_correction_id'];
+    const paneIds = [
+        'article_optimization_id', 
+        'article_stream_optimization_id',
+        'article_format_id', 
+        'selection_pane_id', 
+        'word_correction_id'
+    ];
     paneIds.forEach(id => {
         const tsId = window.Application.PluginStorage.getItem(id);
         if (tsId) {
@@ -53,6 +59,28 @@ const xmlNavbarButtons = {
                 closeAllTaskPanes();
                 const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/article-optimization');
                 window.Application.PluginStorage.setItem('article_optimization_id', taskPane.ID);
+                taskPane.Visible = true;
+            } else {
+                const taskPane = window.Application.GetTaskPane(tsId);
+                if (taskPane.Visible) {
+                    taskPane.Visible = false;
+                } else {
+                    closeAllTaskPanes();
+                    taskPane.Visible = true;
+                }
+            }
+        }
+    },
+    articleStreamOptimization: {
+        id: 'articleStreamOptimization',
+        label: '全文优化(流式)',
+        image: 'images/1.svg',
+        onAction: () => {
+            const tsId = window.Application.PluginStorage.getItem('article_stream_optimization_id');
+            if (!tsId) {
+                closeAllTaskPanes();
+                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/article-stream-optimization');
+                window.Application.PluginStorage.setItem('article_stream_optimization_id', taskPane.ID);
                 taskPane.Visible = true;
             } else {
                 const taskPane = window.Application.GetTaskPane(tsId);
