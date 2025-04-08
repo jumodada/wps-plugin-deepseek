@@ -1,11 +1,16 @@
 <template>
   <div class="optimization-container">
-    <div v-if="loading" class="loading-container">
-      <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
-      <div class="spinner"></div>
+    <div v-if="loading" class="overlay-container">
+      <div class="progress-container">
+        <p class="processing-title">文章处理中</p>
+        <div class="progress-bar">
+          <div class="progress-inner" :style="{ width: `${progressPercentage}%` }"></div>
+        </div>
+        <p class="progress-percentage">{{ Math.round(progressPercentage) }}%</p>
+      </div>
     </div>
     
-    <div v-else-if="showResults" class="results-container">
+    <div v-if="showResults && (filteredData.length > 0 || replacedItems.size > 0 || processComplete)" class="results-container" ref="resultsContainer">
       <!-- 无优化结果情况 -->
       <div v-if="filteredData.length === 0" class="empty-result">
         <div class="result-card">
@@ -25,12 +30,12 @@
         
         <div class="cards-container">
           <div 
-            v-for="item in filteredData" 
+            v-for="(item, index) in filteredData" 
             :key="item.id" 
             class="optimization-card"
             :class="{ 'active': activeCardId === item.id }"
             @click="handleLocateInDocument(item.id)"
-            :ref="el => { if (el) cardRefs[item.id] = el }"
+            :ref="el => { if (el) { cardRefs[item.id] = el; if (index === filteredData.length - 1) lastCardRef = el; } }"
           >
             <!-- 差异展示区 -->
             <div v-if="getDiffDisplay(getOptimizedItem(item.id))" class="diff-display" v-html="getDiffDisplay(getOptimizedItem(item.id))"></div>
@@ -66,7 +71,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { generateDiffAnalysis } from '../api/deepseek';
 import { 
   isWordDocument, 
@@ -88,7 +93,7 @@ export default {
     const processingStatus = ref('');
     const originalData = ref([]);
     const optimizedData = ref([]);
-    const showResults = ref(false);
+    const showResults = ref(true); // 始终显示结果容器，通过遮罩层控制交互
     const replacedItems = ref(new Set());
     const activeCardId = ref(null);
     const activeDocumentName = ref(null);
@@ -97,6 +102,29 @@ export default {
     const processingRef = ref(false);
     const previousActiveCardId = ref(null);
     const cardRefs = ref({});
+    const processComplete = ref(false);
+    const lastCardRef = ref(null);
+    const resultsContainer = ref(null);
+    
+    // 批量处理相关的状态变量
+    const batchSize = ref(3); // 每批处理的段落数量
+    const currentBatch = ref(0);
+    const totalBatches = ref(0);
+    const processedBatches = ref(0);
+    
+    // 进度条相关
+    const progress = ref(0);
+    const simulatedProgress = ref(0);
+    const progressInterval = ref(null);
+    
+    // 计算进度百分比
+    const progressPercentage = computed(() => {
+      if (totalBatches.value === 0) return 0;
+      // 真实进度 + 模拟进度
+      const realProgress = (processedBatches.value / totalBatches.value) * 100;
+      const simulated = simulatedProgress.value / totalBatches.value;
+      return Math.min(Math.max(realProgress + simulated, 0), 100);
+    });
     
     // 计算属性 - 过滤需要展示的数据
     const filteredData = computed(() => {
@@ -108,6 +136,51 @@ export default {
           optimizedItem.text.trim() !== item.text.trim();
       });
     });
+    
+    // 滚动到最新的卡片
+    const scrollToLastCard = () => {
+      nextTick(() => {
+        if (lastCardRef.value) {
+          lastCardRef.value.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      });
+    };
+    
+    // 滚动到顶部
+    const scrollToTop = () => {
+      nextTick(() => {
+        if (resultsContainer.value) {
+          resultsContainer.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    };
+    
+    // 启动模拟进度
+    const startProgressSimulation = () => {
+      // 清除之前的定时器
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+      }
+      
+      simulatedProgress.value = 0;
+      
+      // 设置新的定时器，每100ms增加一点模拟进度，使进度更平滑
+      progressInterval.value = setInterval(() => {
+        if (processedBatches.value < totalBatches.value) {
+          // 模拟进度增量，但确保不会超过下一个真实批次的进度
+          const maxSimulation = 0.95; // 最大模拟到下一批次的95%
+          const increment = 0.1; // 每次增加的进度更小，使过渡更平滑
+          
+          if (simulatedProgress.value < maxSimulation) {
+            simulatedProgress.value += increment;
+          }
+        } else {
+          // 处理完成，清除定时器
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+      }, 100);
+    };
     
     // 根据ID获取优化后的项目
     const getOptimizedItem = (id) => {
@@ -202,12 +275,14 @@ export default {
     const goBack = () => {
       restoreOriginalStyle();
       activeCardId.value = null;
-      showResults.value = false;
+      processComplete.value = false;
       handleStartProcess();
     };
     
     // 处理忽略项目
     const handleIgnoreItem = (id) => {
+      if (loading.value) return; // 处理中不允许操作
+      
       if (activeCardId.value === id) {
         restoreOriginalStyle(id);
         activeCardId.value = null;
@@ -226,6 +301,8 @@ export default {
     
     // 处理替换文本
     const handleReplaceItem = (originalItem, optimizedItem) => {
+      if (loading.value) return; // 处理中不允许操作
+      
       if (activeCardId.value) {
         restoreOriginalStyle(activeCardId.value);
         originalStylesMap.value.delete(activeCardId.value);
@@ -272,6 +349,8 @@ export default {
     
     // 定位到文档中的段落
     const handleLocateInDocument = (paragraphId) => {
+      if (loading.value) return; // 处理中不允许操作
+      
       if (activeCardId.value && activeCardId.value !== paragraphId) {
         restoreOriginalStyle(activeCardId.value);
         activeCardId.value = null;
@@ -340,6 +419,11 @@ export default {
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
+      optimizedData.value = []; // 清空优化结果
+      processComplete.value = false;
+      
+      // 禁止页面滚动
+      document.body.style.overflow = 'hidden';
 
       if (!isWordDocument()) {
         loading.value = false;
@@ -356,100 +440,150 @@ export default {
       if (structuredData.length === 0) {
         message.warning('无法从文档中提取有效内容');
         loading.value = false;
+        document.body.style.overflow = '';
         return;
       }
 
       originalData.value = structuredData;
-      processingStatus.value = `正在处理文档内容...`;
-
+      
+      // 分批处理段落
+      const batches = [];
+      for (let i = 0; i < structuredData.length; i += batchSize.value) {
+        batches.push(structuredData.slice(i, i + batchSize.value));
+      }
+      
+      totalBatches.value = batches.length;
+      currentBatch.value = 0;
+      processedBatches.value = 0;
+      
+      // 启动进度模拟
+      startProgressSimulation();
+      
       try {
-        // 准备发送给API的数据
-        const dataForDeepseek = prepareDataForDeepseek(structuredData);
-
-        // 构建优化API的消息提示
-        const optimizationMessages = buildOptimizationMessages(dataForDeepseek);
-
-        // 调用API进行文本优化
-        const params = {
-          messages: optimizationMessages,
-          model: "deepseek-reasoner",
-          signal: cancelTokenRef.value?.signal
-        };
-
-        const response = await retryOptimization(params);
-
-        if (!processingRef.value) {
-          loading.value = false;
-          return;
-        }
-
-        if (!response?.data?.choices?.length) {
-          loading.value = false;
-          message.error('处理失败，请重试');
-          return;
-        }
-
-        const result = response.data.choices[0].message.content;
-        const jsonMatch = result.match(/(\[.*\])/s);
-        const jsonStr = jsonMatch ? jsonMatch[1] : result;
-        
-        // 解析返回的JSON
-        const resultData = JSON.parse(jsonStr);
-        if (!Array.isArray(resultData)) {
-          message.warning('无法解析API返回结果');
-          loading.value = false;
-          return;
-        }
-        
-        // 处理返回的优化数据
-        optimizedData.value = updateOptimizedData(structuredData, resultData);
-        
-        // 如果没有有效项目，显示提示
-        if (optimizedData.value.length === 0) {
-          message.warning('没有可优化的内容');
-          showResults.value = true;
-          loading.value = false;
-          return;
-        }
-        
-        // 获取每个文本段落的差异分析
-        const diffPromises = optimizedData.value
-          .filter(item => !item.notImprove) // 只处理有变化的项目
-          .map(async (item) => {
-            try {
-              const diffResponse = await generateDiffAnalysis({
-                original: item.originalText,
-                optimized: item.text,
-                signal: cancelTokenRef.value?.signal
-              });
+        // 逐批处理段落
+        for (let i = 0; i < batches.length; i++) {
+          if (!processingRef.value) {
+            break; // 如果处理被中断，跳出循环
+          }
+          
+          currentBatch.value = i + 1;
+          processingStatus.value = `正在处理段落... (${currentBatch.value}/${totalBatches.value})`;
+          
+          // 准备发送给API的数据
+          const dataForDeepseek = prepareDataForDeepseek(batches[i]);
+          
+          // 构建优化API的消息提示
+          const optimizationMessages = buildOptimizationMessages(dataForDeepseek);
+          
+          // 调用API进行文本优化
+          const params = {
+            messages: optimizationMessages,
+            model: "deepseek-reasoner",
+            signal: cancelTokenRef.value?.signal
+          };
+          
+          const response = await retryOptimization(params);
+          
+          if (!processingRef.value) {
+            loading.value = false;
+            document.body.style.overflow = '';
+            return;
+          }
+          
+          if (!response?.data?.choices?.length) {
+            continue; // 跳过这一批次，继续处理下一批次
+          }
+          
+          const result = response.data.choices[0].message.content;
+          const jsonMatch = result.match(/(\[.*\])/s);
+          const jsonStr = jsonMatch ? jsonMatch[1] : result;
+          
+          // 解析返回的JSON
+          try {
+            const resultData = JSON.parse(jsonStr);
+            if (Array.isArray(resultData)) {
+              // 处理返回的优化数据
+              const batchOptimizedData = updateOptimizedData(batches[i], resultData);
+              // 将这一批处理结果合并到总结果中
+              optimizedData.value = [...optimizedData.value, ...batchOptimizedData];
               
-              if (diffResponse?.data?.choices?.length) {
-                const diffResult = diffResponse.data.choices[0].message.content;
-                const diffArray = JSON.parse(diffResult);
-                
-                // 更新对应项的diff属性
-                if (Array.isArray(diffArray)) {
-                  const index = optimizedData.value.findIndex(opt => opt.id === item.id);
-                  if (index !== -1) {
-                    optimizedData.value[index].diff = diffArray;
+              // 获取每个文本段落的差异分析
+              const diffPromises = batchOptimizedData
+                .filter(item => !item.notImprove) // 只处理有变化的项目
+                .map(async (item) => {
+                  try {
+                    const diffResponse = await generateDiffAnalysis({
+                      original: item.originalText,
+                      optimized: item.text,
+                      signal: cancelTokenRef.value?.signal
+                    });
+                    
+                    if (diffResponse?.data?.choices?.length) {
+                      const diffResult = diffResponse.data.choices[0].message.content;
+                      const diffArray = JSON.parse(diffResult);
+                      
+                      // 更新对应项的diff属性
+                      if (Array.isArray(diffArray)) {
+                        const index = optimizedData.value.findIndex(opt => opt.id === item.id);
+                        if (index !== -1) {
+                          optimizedData.value[index].diff = diffArray;
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    console.error('获取差异分析失败:', e);
                   }
-                }
-              }
-            } catch (e) {
-              console.error('获取差异分析失败:', e);
+                });
+              
+              // 等待这一批的差异分析完成
+              await Promise.all(diffPromises);
+              
+              // 滚动到最新的卡片
+              scrollToLastCard();
             }
-          });
+          } catch (e) {
+            console.error('解析API返回结果失败:', e);
+          }
+          
+          // 重置模拟进度，更新实际进度
+          simulatedProgress.value = 0;
+          processedBatches.value++;
+        }
         
-        // 等待所有差异分析完成
-        await Promise.all(diffPromises);
+        // 所有批次处理完成
+        processComplete.value = true;
         
-        // 显示结果
-        showResults.value = true;
+        if (filteredData.value.length === 0) {
+          message.warning('没有可优化的内容');
+        } else {
+          message.success('处理完成！请查看优化结果并选择是否替换。');
+          // 滚动到顶部
+          scrollToTop();
+        }
+        
+        // 清除进度模拟
+        if (progressInterval.value) {
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+        
         loading.value = false;
-        message.success('处理完成！请查看优化结果并选择是否替换。');
+        
+        // 恢复页面滚动
+        document.body.style.overflow = '';
       } catch (error) {
         console.error('处理失败:', error);
         loading.value = false;
+        
+        // 恢复页面滚动
+        document.body.style.overflow = '';
+        
+        // 清除进度模拟
+        if (progressInterval.value) {
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+        
         if (error.name !== 'AbortError') {
           message.error('处理失败，请重试');
         }
@@ -489,9 +623,18 @@ export default {
         clearInterval(intervalId);
       }
       
+      // 恢复页面滚动
+      document.body.style.overflow = '';
+      
       // 清理资源
       if (cancelTokenRef.value) {
         cancelTokenRef.value.abort();
+      }
+      
+      // 清除进度模拟
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+        progressInterval.value = null;
       }
       
       // 恢复所有样式
@@ -522,7 +665,11 @@ export default {
       handleReplaceItem,
       handleIgnoreItem,
       goBack,
-      cardRefs
+      cardRefs,
+      progressPercentage,
+      processComplete,
+      lastCardRef,
+      resultsContainer
     };
   }
 };
@@ -534,39 +681,65 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 100vh;
   background-color: #f0f2f5;
   color: #333;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  position: relative;
 }
 
-.loading-container {
-  width: 100%;
-  max-width: 500px;
+.overlay-container {
+  position: fixed; /* 改为固定定位，不随滚动偏移 */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(1px);
+}
+
+.progress-container {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 20px;
+  width: 80%;
+  max-width: 300px; /* 减小容器宽度 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   text-align: center;
+}
+
+.processing-title {
+  margin: 0 0 15px 0;
   color: #333;
+  font-size: 18px;
+  font-weight: bold;
 }
 
-.processing-status {
-  margin-bottom: 20px;
+.progress-bar {
+  height: 10px; /* 稍微增加高度 */
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.progress-inner {
+  height: 100%;
+  background-color: #1890ff;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  margin: 0;
   color: #333;
-}
-
-.spinner {
-  display: inline-block;
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  border-top-color: #1890ff;
-  animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  font-size: 18px;
+  font-weight: bold;
 }
 
 .results-container {
@@ -618,13 +791,14 @@ export default {
 
 .cards-container {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 10px;
 }
 
 .optimization-card {
-  width: 480px;
+  width: 90%;
+  max-width: 480px;
   position: relative;
   cursor: pointer;
   transition: all 0.3s;

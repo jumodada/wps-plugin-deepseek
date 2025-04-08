@@ -4,7 +4,6 @@
             <tab id="wpsAddinTab" label="wps加载项示例">
 				<group id="btnDemoGroup" label="group1">
                     <button id="articleOptimization" label="全文段落优化" onAction="ribbon.OnAction" getEnabled="ribbon.OnGetEnabled"  getImage="ribbon.GetImage" visible="true" size="large"/>
-                    <button id="articleStreamOptimization" label="全文优化(流式)" onAction="ribbon.OnAction" getEnabled="ribbon.OnGetEnabled"  getImage="ribbon.GetImage" visible="true" size="large"/>
                     <button id="selectionOptimization" label="选择段落优化" onAction="ribbon.OnAction" getEnabled="ribbon.OnGetEnabled"  getImage="ribbon.GetImage" visible="true" size="large"/>
                     <button id="articleFormat" label="文章格式化" onAction="ribbon.OnAction" getEnabled="ribbon.OnGetEnabled"  getImage="ribbon.GetImage" getVisible="ribbon.OnGetVisible" size="large"/>
                     <button id="wordCorrection" label="文章词语纠错" onAction="ribbon.OnAction" getEnabled="ribbon.OnGetEnabled"  getImage="ribbon.GetImage" visible="true" size="large"/>
