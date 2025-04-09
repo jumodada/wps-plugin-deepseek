@@ -1,5 +1,36 @@
 <template>
   <div class="correction-container">
+    <!-- 添加初审/复审的Tab组件 -->
+    <div class="review-tabs" v-if="!loading">
+      <div class="tabs-wrapper">
+        <div 
+          class="tab-item" 
+          :class="{ 'active': reviewType === 'initial', 'disabled': initialReviewCompleted && !canSwitchToInitial }" 
+          @click="handleSwitchTab('initial')"
+        >
+          初审<span v-if="initialReviewCompleted" class="status-icon">✓</span>
+        </div>
+        <div 
+          class="tab-item" 
+          :class="{ 'active': reviewType === 'second', 'disabled': !initialReviewCompleted || secondReviewCompleted || hasUnresolvedInitialItems }" 
+          @click="handleSwitchTab('second')"
+        >
+          复审<span v-if="secondReviewCompleted" class="status-icon">✓</span>
+        </div>
+      </div>
+      <div class="tooltip-wrapper">
+        <a-tooltip 
+          placement="left"
+          :getPopupContainer="(triggerNode) => triggerNode.parentNode"
+        >
+          <template #title>
+            初审主要解决政务性差错、标点符号差错、引用差错等，复审主要解决事实性差错、知识性差错、逻辑性差错、字词差错等。
+          </template>
+          <span class="tooltip-icon">?</span>
+        </a-tooltip>
+      </div>
+    </div>
+
     <div v-if="loading" class="overlay-container">
       <div class="progress-container">
         <p class="processing-title">文档处理中</p>
@@ -17,7 +48,7 @@
         <div class="result-card">
           <p>{{ replacedItems.size > 0 ? '所有错误词语已成功修正' : '没有检测到需要纠正的词语' }}</p>
           <div class="empty-actions">
-            <span class="retry-link" @click="handleStartProcess()">
+            <span class="retry-link" @click="handleStartProcess()" v-if="canRecheck">
               <span class="icon">↻</span>
               重新检测
             </span>
@@ -27,7 +58,7 @@
       
       <!-- 纠错结果列表 -->
       <div v-else class="results-list">
-        <div class="section-header">
+        <div class="section-header" v-if="!loading">
           <h3>检测到的错误词语 <span v-if="loading">{{processingBatchInfo}}</span>({{ filteredData.length }})</h3>
         </div>
         
@@ -98,6 +129,16 @@ import { message } from 'ant-design-vue';
 export default {
   name: 'WordCorrectionPage',
   setup() {
+    // 审核相关状态变量
+    const reviewType = ref('initial'); // 'initial' 或 'second'
+    const initialReviewCompleted = ref(false);
+    const secondReviewCompleted = ref(false);
+    const canSwitchToInitial = ref(true);
+    const canRecheck = computed(() => {
+      return (reviewType.value === 'initial' && !initialReviewCompleted.value) || 
+             (reviewType.value === 'second' && !secondReviewCompleted.value);
+    });
+
     // 状态变量
     const loading = ref(false);
     const processingStatus = ref('');
@@ -143,6 +184,50 @@ export default {
         return !replacedItems.value.has(item.id) && item.errorWord && item.correctedWord;
       });
     });
+
+    // 检查是否还有未处理的初审项
+    const hasUnresolvedInitialItems = computed(() => {
+      return reviewType.value === 'initial' && filteredData.value.length > 0;
+    });
+
+    // Tab切换处理
+    const handleSwitchTab = (type) => {
+      // 初审完成后才能切换到复审
+      if (type === 'second') {
+        if (!initialReviewCompleted.value) {
+          message.warning('请先完成初审');
+          return;
+        }
+        if (hasUnresolvedInitialItems.value) {
+          message.warning('请先处理完所有初审项');
+          return;
+        }
+      }
+      
+      // 复审完成后不能再切换
+      if (secondReviewCompleted.value) {
+        message.warning('当前文档审核已完成');
+        return;
+      }
+      
+      // 初审完成后不能再回到初审
+      if (type === 'initial' && initialReviewCompleted.value && !canSwitchToInitial.value) {
+        message.warning('初审已完成，不能重新初审');
+        return;
+      }
+      
+      if (reviewType.value !== type) {
+        reviewType.value = type;
+        // 切换审核类型后重置纠错数据
+        correctionData.value = [];
+        replacedItems.value = new Set();
+        
+        // 如果切换到复审，自动开始处理
+        if (type === 'second' && initialReviewCompleted.value) {
+          handleStartProcess();
+        }
+      }
+    };
     
     // 滚动到最新的卡片
     const scrollToLastCard = () => {
@@ -157,7 +242,13 @@ export default {
     const scrollToTop = () => {
       nextTick(() => {
         if (resultsContainer.value) {
-          resultsContainer.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const container = resultsContainer.value;
+          const containerTop = container.getBoundingClientRect().top;
+          const offset = 200; // 顶部预留空间
+          window.scrollTo({
+            top: window.scrollY + containerTop - offset,
+            behavior: 'smooth'
+          });
         }
       });
     };
@@ -388,38 +479,65 @@ export default {
         const correctionMessages = [
           {
             role: "system",
-            content: `你是一个专业的词语纠错助手，尤其擅长商务政务类文档的纠错。请检查文本中的错误词语，并提供修正建议。
-            
-            输入数据中的每个元素包含：
-            1. paraID：段落ID
-            2. text：完整文本
-            
-            对于检测到的每一个错误词语，请返回以下信息：
-            1. id: 段落ID
-            2. errorWord: 错误的词语
-            3. correctedWord: 修正后的词语
-            4. context: 包含该词语的上下文
-            5. explanation: 错误类型及修正原因的简短解释
-            
-            请只关注以下类型的错误：
-            - 错别字
-            - 用词不当
-            - 词语搭配不当
-            - 常见的语法错误
-            
-            商务政务文档纠错要求：
-            - 多参考文档的上下文环境，确保在特定语境中选择合适的词语
-            - 注重专业术语的准确性，特别是政策法规、行政管理相关词汇
-            - 修正后的词语应符合官方文件的规范表达和用词习惯
-            - 避免网络流行语、口语化表达，倾向于选择更加正式、严谨的词语
-            - 重视文体的一致性，确保整篇文档风格统一
-            - 关注政务文书特有的表达习惯和专业术语，参考同类文件的标准表达
-            
-            返回格式应为JSON数组，每个元素对应一个错误词语。`
+            content: reviewType.value === 'initial' 
+              ? `你是一个专业的初审纠错助手，专注于商务政务类文档的初审。请检查文本中的错误，并提供修正建议。
+              
+              输入数据中的每个元素包含：
+              1. paraID：段落ID
+              2. text：完整文本
+              
+              对于检测到的每一个错误，请返回以下信息：
+              1. id: 段落ID
+              2. errorWord: 错误的词语
+              3. correctedWord: 修正后的词语
+              4. context: 包含该词语的上下文
+              5. explanation: 错误类型及修正原因的简短解释
+              
+              初审重点关注以下类型的错误：
+              - 政务性差错：不符合政务文件规范的表达
+              - 标点符号差错：标点符号使用错误
+              - 引用差错：引用格式或内容错误
+              - 格式错误：不符合规范的格式
+              
+              初审要求：
+              - 保持政务文件的严肃性和准确性
+              - 修正不规范的表达方式
+              - 确保标点符号使用符合规范
+              - 保证引用内容的准确性和格式正确性
+              - 避免对内容进行无意义的修改，尽量结合全文语境
+              
+              返回格式应为JSON数组，每个元素对应一个错误词语。`
+              : `你是一个专业的复审纠错助手，专注于商务政务类文档的复审。请检查文本中的错误，并提供修正建议。
+              
+              输入数据中的每个元素包含：
+              1. paraID：段落ID
+              2. text：完整文本
+              
+              对于检测到的每一个错误，请返回以下信息：
+              1. id: 段落ID
+              2. errorWord: 错误的词语
+              3. correctedWord: 修正后的词语
+              4. context: 包含该词语的上下文
+              5. explanation: 错误类型及修正原因的简短解释
+              
+              复审重点关注以下类型的错误：
+              - 事实性差错：事实描述不准确
+              - 知识性差错：专业知识错误
+              - 逻辑性差错：逻辑关系不清或矛盾
+              - 字词差错：用词不当、词语搭配不当
+              
+              复审要求：
+              - 确保文档中的事实陈述准确无误
+              - 专业术语使用准确、恰当
+              - 维护文档的逻辑一致性和连贯性
+              - 优化字词使用，提高表达准确性
+              - 避免对内容进行无意义的修改，尽量结合全文语境
+              
+              返回格式应为JSON数组，每个元素对应一个错误词语。`
           },
           {
             role: "user",
-            content: `请检查以下JSON格式的文本内容中的错误词语，根据商务政务文档的标准，找出所有需要纠正的词语，并提供符合政务文书规范的修正建议。返回包含错误信息的JSON数组：\n\n${JSON.stringify(dataForDeepseek)}`
+            content: `请检查以下JSON格式的文本内容中的错误，根据商务政务文档的标准，找出所有需要纠正的词语，并提供符合政务文书规范的修正建议。返回包含错误信息的JSON数组：\n\n${JSON.stringify(dataForDeepseek)}`
           }
         ];
 
@@ -494,7 +612,7 @@ export default {
       }
 
       originalData.value = structuredData;
-      processingStatus.value = `正在检查文档中的词语错误...`;
+      processingStatus.value = `正在检查文档中的${reviewType.value === 'initial' ? '初审' : '复审'}错误...`;
 
       // 分批处理段落
       const batches = [];
@@ -520,7 +638,7 @@ export default {
           }
           
           currentBatch.value = i + 1;
-          processingStatus.value = `正在检查词语错误... (${currentBatch.value}/${totalBatches.value})`;
+          processingStatus.value = `正在检查${reviewType.value === 'initial' ? '初审' : '复审'}错误... (${currentBatch.value}/${totalBatches.value})`;
           processingBatchInfo.value = `(处理中: ${currentBatch.value}/${totalBatches.value})`;
           
           // 调用词语纠错功能
@@ -551,6 +669,14 @@ export default {
         if (progressInterval.value) {
           clearInterval(progressInterval.value);
           progressInterval.value = null;
+        }
+        
+        // 标记当前审核完成
+        if (reviewType.value === 'initial') {
+          initialReviewCompleted.value = true;
+        } else {
+          secondReviewCompleted.value = true;
+          canSwitchToInitial.value = false; // 复审完成后不能再回到初审
         }
         
         loading.value = false;
@@ -585,7 +711,13 @@ export default {
       if (isWordDocument()) {
         const currentDocName = window.Application?.ActiveDocument?.Name;
         if (activeDocumentName.value !== currentDocName) {
+          // 新文档重置所有状态
           activeDocumentName.value = currentDocName;
+          initialReviewCompleted.value = false;
+          secondReviewCompleted.value = false;
+          reviewType.value = 'initial';
+          canSwitchToInitial.value = true;
+          
           if (activeDocumentName.value !== null) { // 不是首次设置才重新处理
             handleStartProcess();
           }
@@ -640,6 +772,15 @@ export default {
     });
     
     return {
+      // 审核相关状态
+      reviewType,
+      initialReviewCompleted,
+      secondReviewCompleted,
+      canSwitchToInitial,
+      canRecheck,
+      handleSwitchTab,
+      
+      // 原有状态
       loading,
       processingStatus,
       originalData,
@@ -668,14 +809,84 @@ export default {
 <style scoped>
 .correction-container {
   padding: 5px;
+  padding-top: 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 100vh;
   background-color: #f0f2f5;
   color: #333;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* 添加Tab样式 */
+.review-tabs {
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.tabs-wrapper {
+  display: flex;
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.tooltip-wrapper {
+  top: 100%;
+  padding-top: 8px;
+}
+
+.tooltip-icon {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  color: #666;
+  font-size: 12px;
+  cursor: help;
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+  position: relative;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-item.active {
+  background-color: #e6f7ff;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.tab-item.disabled {
+  color: #d9d9d9;
+  cursor: not-allowed;
+}
+
+.tab-item:hover:not(.disabled) {
+  color: #40a9ff;
+}
+
+.status-icon {
+  font-size: 12px;
+  margin-left: 4px;
+  color: #52c41a;
 }
 
 .overlay-container {
@@ -685,7 +896,7 @@ export default {
   right: 0;
   bottom: 0;
   background-color: rgba(255, 255, 255, 0.8);
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
