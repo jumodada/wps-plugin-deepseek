@@ -96,7 +96,7 @@ const xmlNavbarButtons = {
     selectionOptimization:{
         id: 'selectionOptimization',
         label: '段落优化',
-        image: 'images/1.svg',
+        image: 'images/2.svg',
         onAction: () => {
             try {
                 const selection = window.Application.Selection;
@@ -151,7 +151,7 @@ const xmlNavbarButtons = {
     wordCorrection: {
         id: 'wordCorrection',
         label: '文章词语纠错',
-        image: 'images/1.svg',
+        image: 'images/4.svg',
         onAction: () => {
             const tsId = window.Application.PluginStorage.getItem('word_correction_id');
             if (!tsId) {
@@ -249,7 +249,7 @@ export default {
   },
   GetImage(control) {
     const config = getConfig(control);
-    return config?.getImageUrl?.();
+    return config?.GetImage?.() ?? config?.image;
   },
   OnGetEnabled(control) {
     const config = getConfig(control);
