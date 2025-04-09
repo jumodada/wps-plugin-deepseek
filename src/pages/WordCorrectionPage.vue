@@ -11,9 +11,9 @@
       </div>
     </div>
     
-    <div v-else-if="showResults" class="results-container">
+    <div class="results-container" v-show="showResults || (loading && correctionData.length > 0)" ref="resultsContainer">
       <!-- 无纠错结果情况 -->
-      <div v-if="filteredData.length === 0" class="empty-result">
+      <div v-if="filteredData.length === 0 && !loading" class="empty-result">
         <div class="result-card">
           <p>{{ replacedItems.size > 0 ? '所有错误词语已成功修正' : '没有检测到需要纠正的词语' }}</p>
           <div class="empty-actions">
@@ -28,17 +28,17 @@
       <!-- 纠错结果列表 -->
       <div v-else class="results-list">
         <div class="section-header">
-          <h3>检测到的错误词语 ({{ filteredData.length }})</h3>
+          <h3>检测到的错误词语 <span v-if="loading">{{processingBatchInfo}}</span>({{ filteredData.length }})</h3>
         </div>
         
         <div class="cards-container">
           <div 
-            v-for="item in filteredData" 
+            v-for="(item, index) in filteredData" 
             :key="item.id" 
             class="correction-card"
             :class="{ 'active': activeCardId === item.id }"
             @click="handleLocateInDocument(item.id)"
-            :ref="el => { if (el) cardRefs[item.id] = el }"
+            :ref="el => { if (el) { cardRefs[item.id] = el; if (index === filteredData.length - 1) lastCardRef = el; } }"
           >
             <!-- 错误词语展示 -->
             <div class="error-word-display">
@@ -72,7 +72,7 @@
         </div>
         
         <!-- 底部返回按钮 -->
-        <div class="bottom-actions">
+        <div class="bottom-actions" v-if="!loading">
           <span class="retry-link" @click="handleStartProcess()">
             <span class="icon">↻</span>
             重新检测
@@ -84,7 +84,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { 
   isWordDocument, 
   extractParagraphsFromDocument, 
@@ -113,6 +113,9 @@ export default {
     const previousActiveCardId = ref(null);
     const cardRefs = ref({});
     const processComplete = ref(false);
+    const processingBatchInfo = ref('');
+    const lastCardRef = ref(null);
+    const resultsContainer = ref(null);
     
     // 批量处理相关的状态变量
     const batchSize = ref(5); // 每批处理的段落数量
@@ -140,6 +143,24 @@ export default {
         return !replacedItems.value.has(item.id) && item.errorWord && item.correctedWord;
       });
     });
+    
+    // 滚动到最新的卡片
+    const scrollToLastCard = () => {
+      nextTick(() => {
+        if (lastCardRef.value) {
+          lastCardRef.value.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      });
+    };
+    
+    // 滚动到顶部
+    const scrollToTop = () => {
+      nextTick(() => {
+        if (resultsContainer.value) {
+          resultsContainer.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    };
     
     // 启动模拟进度
     const startProgressSimulation = () => {
@@ -270,8 +291,6 @@ export default {
         // 强制触发UI更新，但保持光标在当前段落
         const position = result.position >= 0 ? result.position : 0;
         window.Application.ActiveDocument.Range(position, position).Select();
-        
-        message.success(`已修正错误词语`);
       } else {
         message.warning(`未找到原文内容相符的段落`);
       }
@@ -369,7 +388,7 @@ export default {
         const correctionMessages = [
           {
             role: "system",
-            content: `你是一个专业的词语纠错助手。请检查文本中的错误词语，并提供修正建议。
+            content: `你是一个专业的词语纠错助手，尤其擅长商务政务类文档的纠错。请检查文本中的错误词语，并提供修正建议。
             
             输入数据中的每个元素包含：
             1. paraID：段落ID
@@ -388,11 +407,19 @@ export default {
             - 词语搭配不当
             - 常见的语法错误
             
+            商务政务文档纠错要求：
+            - 多参考文档的上下文环境，确保在特定语境中选择合适的词语
+            - 注重专业术语的准确性，特别是政策法规、行政管理相关词汇
+            - 修正后的词语应符合官方文件的规范表达和用词习惯
+            - 避免网络流行语、口语化表达，倾向于选择更加正式、严谨的词语
+            - 重视文体的一致性，确保整篇文档风格统一
+            - 关注政务文书特有的表达习惯和专业术语，参考同类文件的标准表达
+            
             返回格式应为JSON数组，每个元素对应一个错误词语。`
           },
           {
             role: "user",
-            content: `请检查以下JSON格式的文本内容中的错误词语，找出所有需要纠正的词语，并提供修正建议。返回包含错误信息的JSON数组：\n\n${JSON.stringify(dataForDeepseek)}`
+            content: `请检查以下JSON格式的文本内容中的错误词语，根据商务政务文档的标准，找出所有需要纠正的词语，并提供符合政务文书规范的修正建议。返回包含错误信息的JSON数组：\n\n${JSON.stringify(dataForDeepseek)}`
           }
         ];
 
@@ -434,7 +461,6 @@ export default {
       // 先执行返回操作的功能
       restoreOriginalStyle();
       activeCardId.value = null;
-      showResults.value = false;
       correctionData.value = [];
       replacedItems.value = new Set();
       processComplete.value = false;
@@ -482,6 +508,9 @@ export default {
       
       // 启动进度模拟
       startProgressSimulation();
+      
+      // 允许显示结果容器，以便在数据处理过程中展示卡片
+      showResults.value = true;
 
       try {
         // 逐批处理段落
@@ -492,6 +521,7 @@ export default {
           
           currentBatch.value = i + 1;
           processingStatus.value = `正在检查词语错误... (${currentBatch.value}/${totalBatches.value})`;
+          processingBatchInfo.value = `(处理中: ${currentBatch.value}/${totalBatches.value})`;
           
           // 调用词语纠错功能
           const batchCorrectionResults = await performWordCorrection(batches[i]);
@@ -502,8 +532,11 @@ export default {
             return;
           }
           
-          // 合并批次结果
+          // 合并批次结果，实时更新UI
           correctionData.value = [...correctionData.value, ...batchCorrectionResults];
+          
+          // 滚动到最新的卡片
+          scrollToLastCard();
           
           // 重置模拟进度，更新实际进度
           simulatedProgress.value = 0;
@@ -512,16 +545,7 @@ export default {
         
         // 所有批次处理完成
         processComplete.value = true;
-        
-        // 显示结果
-        showResults.value = true;
-        
-        // 如果没有错误词语，显示提示
-        if (correctionData.value.length === 0) {
-          message.success('文档中未发现词语错误');
-        } else {
-          message.success(`检测到 ${correctionData.value.length} 处词语错误，请查看结果`);
-        }
+        processingBatchInfo.value = '';
         
         // 清除进度模拟
         if (progressInterval.value) {
@@ -533,9 +557,13 @@ export default {
         
         // 恢复页面滚动
         document.body.style.overflow = '';
+        
+        // 滚动到顶部
+        scrollToTop();
       } catch (error) {
         console.error('处理失败:', error);
         loading.value = false;
+        processingBatchInfo.value = '';
         
         // 恢复页面滚动
         document.body.style.overflow = '';
@@ -628,7 +656,10 @@ export default {
       handleReplaceItem,
       handleIgnoreItem,
       cardRefs,
-      handleStartProcess
+      handleStartProcess,
+      processingBatchInfo,
+      lastCardRef,
+      resultsContainer
     };
   }
 };

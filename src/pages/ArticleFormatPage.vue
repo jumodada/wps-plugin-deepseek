@@ -286,12 +286,19 @@ export default {
         const messages = [
           {
             role: "system",
-            content: "你是一个专业的文档格式化助手，负责按照用户的要求对Word文档的XML内容进行格式化处理。"
+            content: "你是一个专业的文档格式化助手，尤其擅长商务和政务文档的格式规范处理。负责按照用户的要求对Word文档的XML内容进行格式化处理，确保文档符合正式、专业的格式标准。"
           },
           {
             role: "user",
-            content: `请根据以下格式化要求对Word文档的XML内容进行修改。只需要返回修改后的<w:body>...</w:body>部分(包含body标签)，不要添加任何解释或说明，也不要返回body以外的其他XML内容。
-            
+            content: `请根据以下格式化要求对Word文档的XML内容进行修改，使其符合商务政务文档的规范标准。只需要返回修改后的<w:body>...</w:body>部分(包含body标签)，不要添加任何解释或说明，也不要返回body以外的其他XML内容。
+
+商务政务文档格式化注意事项：
+- 保持文档结构的一致性和规范性
+- 确保段落格式统一，适合正式场合的阅读和展示
+- 标题层级清晰，便于文档导航和理解
+- 文本对齐方式专业统一，增强文档整体美观度
+- 符合国家或行业相关文档格式规范
+
 格式化要求:
 ${formatRequirements.join('\n')}
 
@@ -355,7 +362,6 @@ ${bodyContent}`
               
               // 完成格式化
               doc.Sync.PutUpdate();
-              message.success('文档格式化完成');
             } catch (error) {
               console.error('应用格式化结果时出错:', error);
               message.error('应用格式化结果失败');

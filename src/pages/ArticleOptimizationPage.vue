@@ -340,8 +340,6 @@ export default {
         // 强制触发UI更新，但保持光标在当前段落
         const position = result.position >= 0 ? result.position : 0;
         window.Application.ActiveDocument.Range(position, position).Select();
-        
-        message.success(`已替换内容`);
       } else {
         message.warning(`未找到原文内容相符的段落`);
       }
@@ -556,7 +554,6 @@ export default {
         if (filteredData.value.length === 0) {
           message.warning('没有可优化的内容');
         } else {
-          message.success('处理完成！请查看优化结果并选择是否替换。');
           // 滚动到顶部
           scrollToTop();
         }

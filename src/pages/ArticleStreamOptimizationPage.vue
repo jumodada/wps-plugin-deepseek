@@ -231,8 +231,6 @@ export default {
         // 强制触发UI更新，但保持光标在当前段落
         const position = result.position >= 0 ? result.position : 0;
         window.Application.ActiveDocument.Range(position, position).Select();
-        
-        message.success(`已替换内容`);
       } else {
         message.warning(`未找到原文内容相符的段落`);
       }
@@ -668,7 +666,6 @@ export default {
               showResults.value = true;
               loading.value = false;
               processingComplete.value = false; // 重置完成状态
-              message.success('处理完成！请查看优化结果并选择是否替换。');
             } catch (error) {
               console.error('处理优化结果时出错:', error);
               message.error('处理优化结果失败');
