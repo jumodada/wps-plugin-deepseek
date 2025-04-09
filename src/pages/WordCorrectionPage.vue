@@ -9,6 +9,14 @@
           @click="handleSwitchTab('initial')"
         >
           初审<span v-if="initialReviewCompleted" class="status-icon">✓</span>
+          <a-tooltip 
+            placement="bottom"
+          >
+            <template #title>
+              初审主要解决政务性差错、标点符号差错、引用差错等。
+            </template>
+            <span class="tooltip-icon">?</span>
+          </a-tooltip>
         </div>
         <div 
           class="tab-item" 
@@ -16,18 +24,17 @@
           @click="handleSwitchTab('second')"
         >
           复审<span v-if="secondReviewCompleted" class="status-icon">✓</span>
+          <a-tooltip 
+            placement="bottom"
+          >
+            <template #title>
+              复审主要解决事实性差错、知识性差错、逻辑性差错、字词差错等。
+            </template>
+            <span class="tooltip-icon">?</span>
+          </a-tooltip>
         </div>
       </div>
       <div class="tooltip-wrapper">
-        <a-tooltip 
-          placement="left"
-          :getPopupContainer="(triggerNode) => triggerNode.parentNode"
-        >
-          <template #title>
-            初审主要解决政务性差错、标点符号差错、引用差错等，复审主要解决事实性差错、知识性差错、逻辑性差错、字词差错等。
-          </template>
-          <span class="tooltip-icon">?</span>
-        </a-tooltip>
       </div>
     </div>
 
@@ -866,15 +873,30 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
 }
 
-.tab-item.active {
+.tab-item .tooltip-icon {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  color: #666;
+  font-size: 12px;
+  cursor: help;
+  margin-left: 4px;
+}
+
+.tab-item.active .tooltip-icon {
   background-color: #e6f7ff;
   color: #1890ff;
-  font-weight: 500;
 }
 
-.tab-item.disabled {
+.tab-item.disabled .tooltip-icon {
+  background-color: #f5f5f5;
   color: #d9d9d9;
   cursor: not-allowed;
 }
