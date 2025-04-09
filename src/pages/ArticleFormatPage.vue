@@ -1,111 +1,153 @@
 <template>
   <div class="format-container">
-    <div v-if="loading" class="loading-container">
-      <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
-      <div class="spinner"></div>
-    </div>
-    
-    <div v-else class="format-content">
-      <div class="format-options">
-        <h3>格式化选项</h3>
+    <div class="format-content">
+      <div class="rules-section">
+        <h2>规则基础设置</h2>
         
-        <div class="option-item">
-          <label>
-            <input type="checkbox" v-model="options.standardizeSpacing" />
-            标准化段落间距
-          </label>
+        <div class="form-group">
+          <div class="form-label">名称</div>
+          <input type="text" v-model="ruleName" placeholder="新建规则" class="form-input" />
         </div>
         
-        <div class="option-item">
-          <label>
-            <input type="checkbox" v-model="options.standardizeIndentation" />
-            标准化段落缩进
-          </label>
+        <div class="form-group">
+          <div class="form-label">描述</div>
+          <textarea v-model="description" placeholder="无" class="form-textarea"></textarea>
         </div>
         
-        <div class="option-item">
-          <label>
-            <input type="checkbox" v-model="options.standardizeFont" />
-            统一字体样式
-          </label>
-          <div v-if="options.standardizeFont" class="sub-option">
-            <select v-model="fontOptions.fontFamily">
-              <option value="宋体">宋体</option>
-              <option value="黑体">黑体</option>
-              <option value="微软雅黑">微软雅黑</option>
-              <option value="仿宋">仿宋</option>
-              <option value="楷体">楷体</option>
-              <option value="Arial">Arial</option>
-              <option value="Times New Roman">Times New Roman</option>
-            </select>
+        <div class="form-group margin-settings">
+          <div class="form-label">页边距</div>
+          <div class="margin-inputs">
+            <div class="margin-input-group">
+              <label>上</label>
+              <input type="number" v-model="margins.top" class="margin-input" />
+            </div>
+            <div class="margin-input-group">
+              <label>下</label>
+              <input type="number" v-model="margins.bottom" class="margin-input" />
+            </div>
+            <div class="margin-input-group">
+              <label>左</label>
+              <input type="number" v-model="margins.left" class="margin-input" />
+            </div>
+            <div class="margin-input-group">
+              <label>右</label>
+              <input type="number" v-model="margins.right" class="margin-input" />
+            </div>
           </div>
         </div>
-        
-        <div class="option-item">
-          <label>
-            <input type="checkbox" v-model="options.standardizeFontSize" />
-            统一字号大小
-          </label>
-          <div v-if="options.standardizeFontSize" class="sub-option">
-            <select v-model="fontOptions.fontSize">
-              <option value="10">10</option>
-              <option value="11">11</option>
-              <option value="12">12</option>
-              <option value="14">14</option>
-              <option value="16">16</option>
-              <option value="18">18</option>
-              <option value="20">20</option>
-              <option value="22">22</option>
-            </select>
+
+        <div class="form-group">
+          <div class="form-label">奇偶页码</div>
+          <div class="switch-container">
+            <input type="checkbox" v-model="oddEvenPages" class="switch-input" />
           </div>
         </div>
-        
-        <div class="option-item">
-          <label>
-            <input type="checkbox" v-model="options.standardizeAlignment" />
-            段落对齐方式
-          </label>
-          <div v-if="options.standardizeAlignment" class="sub-option">
-            <select v-model="alignmentOption">
-              <option value="1">左对齐</option>
-              <option value="2">居中</option>
-              <option value="3">右对齐</option>
-              <option value="4">两端对齐</option>
-            </select>
+
+        <div class="form-group">
+          <div class="form-label">22x28</div>
+          <div class="switch-container">
+            <input type="checkbox" v-model="is22x28" class="switch-input" />
           </div>
         </div>
-        
-        <div class="option-item">
-          <label>
-            <input type="checkbox" v-model="options.standardizeLineSpacing" />
-            标准化行间距
-          </label>
-          <div v-if="options.standardizeLineSpacing" class="sub-option">
-            <select v-model="lineSpacingOption">
-              <option value="1">单倍行距</option>
-              <option value="1.5">1.5倍行距</option>
-              <option value="2">2倍行距</option>
-            </select>
-          </div>
+
+        <div class="rules-table">
+          <h3>排版规则</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>大纲</th>
+                <th>匹配规则</th>
+                <th>中文字体</th>
+                <th>英文和数字字体</th>
+                <th>字号</th>
+                <th>缩进</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>文件标题</td>
+                <td>
+                  <select v-model="rules.title.outline" class="rule-select">
+                    <option value="正文">正文</option>
+                  </select>
+                </td>
+                <td>正则语法</td>
+                <td>
+                  <select v-model="rules.title.chineseFont" class="rule-select">
+                    <option value="方正小标宋_GBK">方正小标宋_GBK</option>
+                  </select>
+                </td>
+                <td>
+                  <select v-model="rules.title.englishFont" class="rule-select">
+                    <option value="Times New Roman">Times New Roman</option>
+                  </select>
+                </td>
+                <td>
+                  <input type="number" v-model="rules.title.fontSize" class="rule-input" />
+                </td>
+                <td>
+                  <input type="number" v-model="rules.title.indent" class="rule-input" />
+                </td>
+              </tr>
+              <tr>
+                <td>副标题</td>
+                <td>
+                  <select v-model="rules.subtitle.outline" class="rule-select">
+                    <option value="正文">正文</option>
+                  </select>
+                </td>
+                <td>正则语法</td>
+                <td>
+                  <select v-model="rules.subtitle.chineseFont" class="rule-select">
+                    <option value="方正楷体_GBK">方正楷体_GBK</option>
+                  </select>
+                </td>
+                <td>
+                  <select v-model="rules.subtitle.englishFont" class="rule-select">
+                    <option value="Times New Roman">Times New Roman</option>
+                  </select>
+                </td>
+                <td>
+                  <input type="number" v-model="rules.subtitle.fontSize" class="rule-input" />
+                </td>
+                <td>
+                  <input type="number" v-model="rules.subtitle.indent" class="rule-input" />
+                </td>
+              </tr>
+              <tr>
+                <td>正文</td>
+                <td>
+                  <select v-model="rules.body.outline" class="rule-select">
+                    <option value="正文">正文</option>
+                  </select>
+                </td>
+                <td>正则语法</td>
+                <td>
+                  <select v-model="rules.body.chineseFont" class="rule-select">
+                    <option value="方正仿宋_GBK">方正仿宋_GBK</option>
+                  </select>
+                </td>
+                <td>
+                  <select v-model="rules.body.englishFont" class="rule-select">
+                    <option value="Times New Roman">Times New Roman</option>
+                  </select>
+                </td>
+                <td>
+                  <input type="number" v-model="rules.body.fontSize" class="rule-input" />
+                </td>
+                <td>
+                  <input type="number" v-model="rules.body.indent" class="rule-input" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <button class="add-rule-btn">添加一条规则</button>
         </div>
-        
-        <div class="option-item custom-format">
-          <label>额外格式要求</label>
-          <textarea v-model="customFormatRequirements" 
-                    placeholder="请输入额外的格式要求，如特定标题格式、图表要求等"
-                    rows="4"></textarea>
-        </div>
-        
-        <div class="format-buttons">
-          <button class="format-button" @click="handleFormatDocument">应用格式化</button>
-        </div>
-      </div>
-      
-      <div class="format-preview">
-        <h3>格式化预览</h3>
-        <div class="preview-content">
-          <p :style="previewStyle">这是一个格式化预览示例段落。您可以在左侧选择不同的格式化选项，右侧将显示应用这些选项后的效果预览。</p>
-          <p :style="previewStyle">段落之间的间距、缩进、字体、大小等样式将根据您选择的选项进行调整。</p>
+
+        <div class="action-buttons">
+          <button class="save-btn">保存本组设置</button>
+          <button class="delete-btn">删除本组规则</button>
         </div>
       </div>
     </div>
@@ -113,331 +155,53 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
-import { message } from 'ant-design-vue';
-import { submitOptimization, submitStreamFormatting } from '../api/deepseek';
-import { isWordDocument } from '../tool/optimization';
-import { handleStreamResponse } from '../services/request';
+import { ref } from 'vue';
 
 export default {
   name: 'ArticleFormatPage',
   setup() {
-    // 状态变量
-    const loading = ref(false);
-    const processingStatus = ref('');
-    const activeDocumentName = ref(null);
-    const customFormatRequirements = ref('');
-    
-    // 格式化选项
-    const options = ref({
-      standardizeSpacing: true,
-      standardizeIndentation: true,
-      standardizeFont: false,
-      standardizeFontSize: false,
-      standardizeAlignment: false,
-      standardizeLineSpacing: false
+    const ruleName = ref('新建规则');
+    const description = ref('');
+    const margins = ref({
+      top: 37,
+      bottom: 35,
+      left: 28,
+      right: 26
     });
-    
-    // 字体选项
-    const fontOptions = ref({
-      fontFamily: '微软雅黑',
-      fontSize: '12'
-    });
-    
-    // 对齐方式选项 (1: 左对齐, 2: 居中, 3: 右对齐, 4: 两端对齐)
-    const alignmentOption = ref('1');
-    
-    // 行间距选项
-    const lineSpacingOption = ref('1.5');
-    
-    // 预览样式计算属性
-    const previewStyle = computed(() => {
-      const style = {};
-      
-      if (options.value.standardizeFont) {
-        style.fontFamily = fontOptions.value.fontFamily;
-      }
-      
-      if (options.value.standardizeFontSize) {
-        style.fontSize = `${fontOptions.value.fontSize}pt`;
-      }
-      
-      if (options.value.standardizeAlignment) {
-        const alignMap = {
-          '1': 'left',
-          '2': 'center',
-          '3': 'right',
-          '4': 'justify'
-        };
-        style.textAlign = alignMap[alignmentOption.value];
-      }
-      
-      if (options.value.standardizeLineSpacing) {
-        style.lineHeight = lineSpacingOption.value;
-      }
-      
-      if (options.value.standardizeIndentation) {
-        style.textIndent = '2em';
-      }
-      
-      if (options.value.standardizeSpacing) {
-        style.marginBottom = '1em';
-      }
-      
-      return style;
-    });
-    
-    // 获取文档XML内容
-    const getDocumentXML = () => {
-      try {
-        const doc = window.Application.ActiveDocument;
-        return doc.WordOpenXML;
-      } catch (error) {
-        console.error('获取文档XML失败:', error);
-        return null;
-      }
-    };
-    
-    // 从XML中提取body内容
-    const extractBodyContent = (xml) => {
-      if (!xml) return null;
-      
-      const bodyStartTag = '<w:body>';
-      const bodyEndTag = '</w:body>';
-      
-      const bodyStartIndex = xml.indexOf(bodyStartTag);
-      const bodyEndIndex = xml.indexOf(bodyEndTag) + bodyEndTag.length;
-      
-      if (bodyStartIndex === -1 || bodyEndIndex === -1) {
-        console.error('无法在XML中找到body标签');
-        return null;
-      }
-      
-      return xml.substring(bodyStartIndex, bodyEndIndex);
-    };
+    const oddEvenPages = ref(false);
+    const is22x28 = ref(false);
 
-    // 文档格式化处理函数
-    const handleFormatDocument = async () => {
-      if (!isWordDocument()) {
-        message.warning('请先打开Word文档');
-        return;
-      }
-      
-      loading.value = true;
-      processingStatus.value = '正在准备文档内容...';
-      
-      try {
-        // 获取当前文档的XML内容
-        const docXML = getDocumentXML();
-        if (!docXML) {
-          message.error('无法获取文档内容');
-          loading.value = false;
-          return;
-        }
-        
-        // 提取body内容
-        const bodyContent = extractBodyContent(docXML);
-        if (!bodyContent) {
-          message.error('无法提取文档内容');
-          loading.value = false;
-          return;
-        }
-        
-        // 构建格式化要求内容
-        const formatRequirements = [];
-        
-        if (options.value.standardizeSpacing) {
-          formatRequirements.push('段落间距: 段后间距6磅');
-        }
-        
-        if (options.value.standardizeIndentation) {
-          formatRequirements.push('段落缩进: 首行缩进2字符');
-        }
-        
-        if (options.value.standardizeFont) {
-          formatRequirements.push(`字体: ${fontOptions.value.fontFamily}`);
-        }
-        
-        if (options.value.standardizeFontSize) {
-          formatRequirements.push(`字号: ${fontOptions.value.fontSize}磅`);
-        }
-        
-        if (options.value.standardizeAlignment) {
-          const alignMap = {
-            '1': '左对齐',
-            '2': '居中',
-            '3': '右对齐',
-            '4': '两端对齐'
-          };
-          formatRequirements.push(`对齐方式: ${alignMap[alignmentOption.value]}`);
-        }
-        
-        if (options.value.standardizeLineSpacing) {
-          formatRequirements.push(`行间距: ${lineSpacingOption.value}倍行距`);
-        }
-        
-        // 添加用户自定义格式要求
-        if (customFormatRequirements.value.trim()) {
-          formatRequirements.push(`自定义要求: ${customFormatRequirements.value.trim()}`);
-        }
-        
-        // 构建消息内容
-        processingStatus.value = '正在处理格式化请求...';
-        const messages = [
-          {
-            role: "system",
-            content: "你是一个专业的文档格式化助手，尤其擅长商务和政务文档的格式规范处理。负责按照用户的要求对Word文档的XML内容进行格式化处理，确保文档符合正式、专业的格式标准。"
-          },
-          {
-            role: "user",
-            content: `请根据以下格式化要求对Word文档的XML内容进行修改，使其符合商务政务文档的规范标准。只需要返回修改后的<w:body>...</w:body>部分(包含body标签)，不要添加任何解释或说明，也不要返回body以外的其他XML内容。
-
-商务政务文档格式化注意事项：
-- 保持文档结构的一致性和规范性
-- 确保段落格式统一，适合正式场合的阅读和展示
-- 标题层级清晰，便于文档导航和理解
-- 文本对齐方式专业统一，增强文档整体美观度
-- 符合国家或行业相关文档格式规范
-
-格式化要求:
-${formatRequirements.join('\n')}
-
-原始XML内容:
-${bodyContent}`
-          }
-        ];
-        
-        // 创建取消令牌
-        const controller = new AbortController();
-        
-        // 调用流式AI接口处理格式化
-        const response = await submitStreamFormatting({
-          messages: messages,
-          signal: controller.signal
-        });
-        
-        // 用于存储完整的格式化结果
-        let formattedXML = '';
-        let isProcessing = true;
-        
-        // 处理流式响应
-        handleStreamResponse(
-          response,
-          // 数据回调
-          (data) => {
-            if (data.choices && data.choices.length > 0) {
-              const content = data.choices[0].delta?.content || '';
-              if (content) {
-                formattedXML += content;
-                // 更新处理状态
-                processingStatus.value = `正在处理格式化... (${formattedXML.length} 字符)`;
-              }
-            }
-          },
-          // 错误回调
-          (error) => {
-            console.error('流式处理出错:', error);
-            isProcessing = false;
-            message.error('格式化处理出错，请重试');
-            loading.value = false;
-            processingStatus.value = '';
-          },
-          // 完成回调
-          () => {
-            isProcessing = false;
-            if (!formattedXML) {
-              message.error('未获取到有效的格式化结果');
-              loading.value = false;
-              processingStatus.value = '';
-              return;
-            }
-            
-            processingStatus.value = '正在应用格式化结果...';
-            
-            try {
-              // 将格式化后的内容应用到文档
-              const doc = window.Application.ActiveDocument;
-              doc.Content.Text = ''; // 清空文档内容
-              doc.Content.InsertXML(formattedXML); // 插入格式化后的内容
-              
-              // 完成格式化
-              doc.Sync.PutUpdate();
-            } catch (error) {
-              console.error('应用格式化结果时出错:', error);
-              message.error('应用格式化结果失败');
-            } finally {
-              loading.value = false;
-              processingStatus.value = '';
-            }
-          }
-        );
-        
-        // 添加取消按钮处理
-        const cancelButton = document.createElement('button');
-        cancelButton.textContent = '取消';
-        cancelButton.className = 'cancel-button';
-        cancelButton.onclick = () => {
-          controller.abort();
-          isProcessing = false;
-          loading.value = false;
-          processingStatus.value = '已取消';
-          setTimeout(() => {
-            processingStatus.value = '';
-          }, 2000);
-        };
-        
-        // 将取消按钮添加到处理状态下方
-        const statusContainer = document.querySelector('.processing-status');
-        if (statusContainer && statusContainer.parentNode) {
-          statusContainer.parentNode.appendChild(cancelButton);
-        }
-        
-      } catch (error) {
-        console.error('格式化文档时出错:', error);
-        message.error('格式化文档失败，请重试');
-        loading.value = false;
-        processingStatus.value = '';
-      }
-    };
-    
-    // 监听文档名称变化
-    const checkDocumentName = () => {
-      if (isWordDocument()) {
-        const currentDocName = window.Application.ActiveDocument?.Name;
-        if (activeDocumentName.value !== currentDocName) {
-          activeDocumentName.value = currentDocName;
-        }
-      }
-    };
-    
-    let intervalId = null;
-    
-    onMounted(() => {
-      // 初始设置文档名
-      if (isWordDocument()) {
-        activeDocumentName.value = window.Application.ActiveDocument?.Name;
-      }
-      
-      // 设置定时检查
-      intervalId = setInterval(checkDocumentName, 1000);
-    });
-    
-    onBeforeUnmount(() => {
-      if (intervalId) {
-        clearInterval(intervalId);
+    const rules = ref({
+      title: {
+        outline: '正文',
+        chineseFont: '方正小标宋_GBK',
+        englishFont: 'Times New Roman',
+        fontSize: 22,
+        indent: 0
+      },
+      subtitle: {
+        outline: '正文',
+        chineseFont: '方正楷体_GBK',
+        englishFont: 'Times New Roman',
+        fontSize: 16,
+        indent: 0
+      },
+      body: {
+        outline: '正文',
+        chineseFont: '方正仿宋_GBK',
+        englishFont: 'Times New Roman',
+        fontSize: 16,
+        indent: 2
       }
     });
-    
+
     return {
-      loading,
-      processingStatus,
-      options,
-      fontOptions,
-      alignmentOption,
-      lineSpacingOption,
-      customFormatRequirements,
-      previewStyle,
-      handleFormatDocument
+      ruleName,
+      description,
+      margins,
+      oddEvenPages,
+      is22x28,
+      rules
     };
   }
 };
@@ -445,161 +209,185 @@ ${bodyContent}`
 
 <style scoped>
 .format-container {
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background-color: #f0f2f5;
-  color: #333;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-.loading-container {
-  width: 100%;
-  text-align: center;
-  color: #333;
-  margin-top: 20px;
-}
-
-.processing-status {
-  margin-bottom: 20px;
-  color: #333;
-}
-
-.spinner {
-  display: inline-block;
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  border-top-color: #1890ff;
-  animation: spin 1s ease-in-out infinite;
-}
-
-.cancel-button {
-  margin-top: 10px;
-  padding: 5px 15px;
-  background-color: #ff4d4f;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s;
-}
-
-.cancel-button:hover {
-  background-color: #ff7875;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  padding: 20px;
+  background-color: #fff;
+  color: #262626;
 }
 
 .format-content {
-  display: flex;
-  flex-direction: row;
-  gap: 20px;
-  margin-top: 10px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.format-options, .format-preview {
-  background: white;
-  border-radius: 4px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  flex: 1;
-}
-
-.format-options h3, .format-preview h3 {
-  margin-top: 0;
+.rules-section h2 {
   margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e8e8e8;
-  color: #333;
+  font-size: 18px;
+  font-weight: normal;
+  color: #262626;
 }
 
-.option-item {
-  margin-bottom: 15px;
-  display: flex;
-  flex-direction: column;
+.form-group {
+  margin-bottom: 20px;
 }
 
-.option-item label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.option-item input[type="checkbox"] {
-  margin-right: 8px;
-}
-
-.sub-option {
-  margin-top: 8px;
-  margin-left: 25px;
-}
-
-.sub-option select {
-  width: 100%;
-  padding: 6px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  background-color: white;
-}
-
-.custom-format {
-  margin-top: 15px;
-}
-
-.custom-format label {
+.form-label {
   margin-bottom: 8px;
-  display: block;
+  color: #262626;
+  font-weight: 500;
 }
 
-.custom-format textarea {
+.form-input, .form-textarea {
   width: 100%;
   padding: 8px;
   border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  border-radius: 2px;
+  color: #262626;
+}
+
+.form-textarea {
+  height: 80px;
   resize: vertical;
-  font-family: inherit;
 }
 
-.format-buttons {
-  margin-top: 25px;
+.margin-settings {
+  margin-top: 20px;
+}
+
+.margin-inputs {
   display: flex;
-  justify-content: center;
+  gap: 20px;
 }
 
-.format-button {
-  padding: 8px 16px;
-  background-color: #1890ff;
-  color: white;
-  border: none;
-  border-radius: 4px;
+.margin-input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.margin-input-group label {
+  color: #262626;
+}
+
+.margin-input {
+  width: 60px;
+  padding: 4px;
+  text-align: center;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  color: #262626;
+}
+
+.switch-container {
+  display: inline-block;
+}
+
+.switch-input {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  appearance: none;
+  background-color: #bfbfbf;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
   transition: background-color 0.3s;
 }
 
-.format-button:hover {
+.switch-input:checked {
+  background-color: #1890ff;
+}
+
+.switch-input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: left 0.3s;
+}
+
+.switch-input:checked::before {
+  left: 22px;
+}
+
+.rules-table {
+  margin-top: 30px;
+}
+
+.rules-table h3 {
+  margin-bottom: 15px;
+  font-size: 16px;
+  font-weight: normal;
+  color: #262626;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px 8px;
+  border: 1px solid #e8e8e8;
+  text-align: left;
+  color: #262626;
+}
+
+th {
+  background-color: #fafafa;
+  font-weight: 500;
+  color: #262626;
+}
+
+.rule-select, .rule-input {
+  width: 100%;
+  padding: 4px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  color: #262626;
+}
+
+.add-rule-btn {
+  margin-top: 15px;
+  padding: 8px 16px;
+  color: #1890ff;
+  border: 1px solid #1890ff;
+  background: transparent;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.action-buttons {
+  margin-top: 30px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.save-btn, .delete-btn {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.save-btn {
+  background-color: #1890ff;
+  color: white;
+}
+
+.delete-btn {
+  background-color: #ff4d4f;
+  color: white;
+}
+
+.save-btn:hover {
   background-color: #40a9ff;
 }
 
-.preview-content {
-  padding: 15px;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
-  background-color: #fafafa;
-  min-height: 200px;
-}
-
-@media (max-width: 768px) {
-  .format-content {
-    flex-direction: column;
-  }
+.delete-btn:hover {
+  background-color: #ff7875;
 }
 </style> 
