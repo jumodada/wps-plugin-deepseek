@@ -1,4 +1,4 @@
-import { submitOptimization } from '../api/deepseek';
+import { submitOptimization, submitWordCorrection } from '../api/deepseek';
 
 // 检查是否是Word文档
 export const isWordDocument = () => {
@@ -224,6 +224,27 @@ export const retryOptimization = async (params, maxRetries = 3) => {
     }
     
     throw lastError || new Error('优化请求失败，已达到最大重试次数');
+};
+
+// 重试词语纠错请求
+export const retryWordCorrection = async (params, maxRetries = 3) => {
+    let lastError;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            return await submitWordCorrection(params);
+        } catch (error) {
+            if (error?.name === 'AbortError' || error?.name === 'CanceledError') {
+                throw error;
+            }
+            
+            lastError = error;
+            
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+    }
+    
+    throw lastError || new Error('词语纠错请求失败，已达到最大重试次数');
 };
 
 // 替换文档中的段落
@@ -543,11 +564,10 @@ export const handleImageLineBreak = () => {
 
 // 准备发送给deepseek的数据格式 - 更新版
 export const prepareDataForDeepseek = (paragraphs) => {
-    // 发送id、text和textArray（文本节点数组）
+    // 只发送id和text，让接口自己判断错误词语
     return paragraphs.map(paragraph => ({
         paraID: paragraph.id,
-        text: paragraph.text,       // 合并后的文本（用于兼容和显示）
-        textArray: paragraph.textArray // 添加原始文本数组
+        text: paragraph.text       // 合并后的文本（用于兼容和显示）
     }));
 };
 
@@ -598,6 +618,82 @@ export const updateOptimizedData = (originalData, optimizedData) => {
                 text: optItem.text,               // 优化后的文本
                 notImprove: !hasChanges,
                 diff: [],  // 初始化差异数组
+                replaced: false
+            });
+        }
+    }
+    
+    return result;
+};
+
+// 准备发送给deepseek的词语纠错数据
+export const prepareDataForWordCorrection = (paragraphs) => {
+    // 发送id、text和textArray（文本节点数组）
+    return paragraphs.map(paragraph => ({
+        paraID: paragraph.id,
+        text: paragraph.text,
+        textArray: paragraph.textArray
+    }));
+};
+
+// 构建词语纠错API的消息提示
+export const buildWordCorrectionMessages = (dataForDeepseek) => {
+    return [
+        {
+            role: "system",
+            content: `你是一个专业的词语纠错助手。你的任务是识别文本中使用不当或错误的词语，并提供正确的替代词。请仅对词语进行纠正，保持原文结构不变。
+
+            输入数据中的每个元素包含：
+            1. paraID：段落ID
+            2. text：完整文本
+            
+            请注意：
+            - 你的任务是识别文本中在语义上、逻辑性上或适用性上不正确的词语
+            - 每处纠正都需要提供明确的理由，说明为什么原词不合适以及为何替换词更好
+            - 只纠正确实存在问题的词语，不要改动表达正确的内容
+            - 纠正应考虑词语在上下文中的适用性和语义连贯性
+            - 返回JSON格式，包含段落ID、纠正后的完整文本，以及详细的纠正列表`
+        },
+        {
+            role: "user",
+            content: `请检查以下JSON格式的文本内容中存在的词语错误，并提供纠正建议：\n\n${JSON.stringify(dataForDeepseek)}\n\n请按以下JSON格式返回纠错结果：
+            [{
+              "paraID": "段落ID", 
+              "text": "纠正后的文本", 
+              "corrections": [
+                {"originText": "错误词语", "replacedText": "纠正词语", "reason": "纠正理由"}
+              ]
+            }]
+            
+            注意：
+            1. 只标记真正有误的词语，不要修改正确的表达
+            2. 纠正的理由应简洁明了地说明为什么原词语存在问题以及为何替换词更合适
+            3. 如果某个段落没有需要纠正的内容，请保持原文不变并在corrections中返回空数组
+            4. 直接返回JSON格式数据，无需其他说明`
+        }
+    ];
+};
+
+// 更新deepseek返回的词语纠错数据
+export const updateWordCorrectionData = (originalData, correctionData) => {
+    const result = [];
+    
+    // correctionData的格式应该是: [{paraID: 'id', text: '纠正后的文本', corrections: [{originText, replacedText, reason}]}]
+    for (const corrItem of correctionData) {
+        const originalItem = originalData.find(item => item.id === corrItem.paraID);
+        if (originalItem) {
+            // 检查是否有需要纠正的内容
+            const hasCorrections = corrItem.corrections && corrItem.corrections.length > 0;
+            
+            // 将处理后的数据添加到结果中
+            result.push({
+                id: corrItem.paraID,
+                originalText: originalItem.text,
+                textArray: originalItem.textArray, // 保留原始文本数组用于替换操作
+                xml: originalItem.xml,            // 保留原始XML
+                text: corrItem.text,              // 纠正后的文本
+                corrections: corrItem.corrections || [], // 纠正详情
+                noCorrection: !hasCorrections,
                 replaced: false
             });
         }

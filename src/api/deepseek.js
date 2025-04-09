@@ -69,6 +69,51 @@ export const generateDiffAnalysis = (params) => {
   });
 };
 
+// 提交词语纠错请求
+export const submitWordCorrection = (params) => {
+  return apiClient.post('/v1/chat/completions', {
+      messages: [
+        {
+          role: "system",
+          content: "你是一个专业的词语纠错助手。你的任务是识别文本中使用不当或错误的词语，并提供正确的替代词。请仅对词语进行纠正，保持原文结构不变。\n\n必须严格遵循以下规则：\n1. 只纠正在语义、适用性或逻辑性上存在明显错误的词语\n2. 纠正时必须考虑词语在上下文中的语义连贯性和适用性\n3. 不要修改语法正确、表达清晰的词语，即使有更好的表达方式\n4. 每个修改必须提供明确的理由，解释为什么原词有误以及为何替换词更合适\n5. 返回的修改必须采用JSON格式"
+        },
+        {
+          role: "user",
+          content: `请检查以下文本中存在的词语错误，并提供纠正建议：\n\n${JSON.stringify(params.documents)}\n\n请按以下JSON格式返回纠错结果：\n[{\"paraID\": \"段落ID\", \"text\": \"纠正后的文本\", \"corrections\": [{\"originText\": \"错误词语\", \"replacedText\": \"纠正词语\", \"reason\": \"纠正理由\"}]}]\n\n注意：\n1. 只标记真正有误的词语，不要修改正确的表达\n2. 纠正的理由应简洁明了地说明为什么原词语存在问题以及为何替换词更合适\n3. 如果某个段落没有需要纠正的内容，请保持原文不变并在corrections中返回空数组\n4. 直接返回JSON格式数据，无需其他说明`
+        }
+      ],
+      model: "qwen-plus",
+      stream: false,
+      max_tokens: 8192,
+      temperature: 0.3,
+  }, {
+    signal: params.signal
+  });
+};
+
+// 流式提交词语纠错请求
+export const submitStreamWordCorrection = (params) => {
+  return apiClient.post('/v1/chat/completions', {
+      messages: [
+        {
+          role: "system",
+          content: "你是一个专业的词语纠错助手。你的任务是识别文本中使用不当或错误的词语，并提供正确的替代词。请仅对词语进行纠正，保持原文结构不变。\n\n必须严格遵循以下规则：\n1. 只纠正在语义、适用性或逻辑性上存在明显错误的词语\n2. 纠正时必须考虑词语在上下文中的语义连贯性和适用性\n3. 不要修改语法正确、表达清晰的词语，即使有更好的表达方式\n4. 每个修改必须提供明确的理由，解释为什么原词有误以及为何替换词更合适\n5. 返回的修改必须采用JSON格式"
+        },
+        {
+          role: "user",
+          content: `请检查以下文本中存在的词语错误，并提供纠正建议：\n\n${JSON.stringify(params.documents)}\n\n请按以下JSON格式返回纠错结果：\n[{\"paraID\": \"段落ID\", \"text\": \"纠正后的文本\", \"corrections\": [{\"originText\": \"错误词语\", \"replacedText\": \"纠正词语\", \"reason\": \"纠正理由\"}]}]\n\n注意：\n1. 只标记真正有误的词语，不要修改正确的表达\n2. 纠正的理由应简洁明了地说明为什么原词语存在问题以及为何替换词更合适\n3. 如果某个段落没有需要纠正的内容，请保持原文不变并在corrections中返回空数组\n4. 直接返回JSON格式数据，无需其他说明`
+        }
+      ],
+      model: "qwen-plus",
+      stream: true,
+      max_tokens: 8192,
+      temperature: 0.3,
+  }, {
+    signal: params.signal,
+    responseType: 'stream'
+  });
+};
+
 // 获取文档总token估算值
 export const getDocumentTokenEstimation = (documentContent) => {
   // 一个粗略的估算：中文约每个字符1token，英文约每4个字符1token
