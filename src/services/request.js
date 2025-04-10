@@ -14,7 +14,8 @@ import { message } from 'ant-design-vue';
 // 创建axios实例
 const apiClient = axios.create({
   //baseURL: 'http://47.104.92.121:7001',
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode',
+  //baseURL: 'https://dashscope.aliyuncs.com/compatible-mode',
+  baseURL: 'https://ark.cn-beijing.volces.com',
   timeout: 1000000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json',
@@ -53,12 +54,15 @@ apiClient.interceptors.response.use(
     // 检查是否是请求取消的错误
     if (axios.isCancel(error) || error.name === 'AbortError' || error.name === 'CanceledError') {
       // 请求被取消，不显示错误消息
+      console.log('请求已取消');
       return Promise.reject(error);
     }
-
-    // 显示错误消息
-    message.error(error.response?.data?.message || '请求失败');
-    return Promise.reject(error.response);
+    
+    // 静默处理请求错误，不显示错误消息
+    console.error('请求错误:', error.response?.data?.message || error.message || '未知错误');
+    
+    // 返回错误对象但不显示错误消息
+    return Promise.reject(error.response || error);
   }
 );
 
@@ -150,8 +154,12 @@ export function fetchStreamRequest(url, options = {}) {
         return Promise.reject(error);
       }
       
+      // 静默处理错误
+      console.error('请求失败:', error.message || '未知错误');
+      
       if (onError) onError(error);
-      message.error(error.message || '请求失败');
+      
+      // 不显示错误消息
       return Promise.reject(error);
     });
 }

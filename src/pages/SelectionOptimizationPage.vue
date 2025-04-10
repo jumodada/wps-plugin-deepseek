@@ -74,6 +74,7 @@ import {
   isWordDocument, 
   retryOptimization,
 } from '../tool/optimization';
+import axios from 'axios';
 
 export default {
   name: 'SelectionOptimizationPage',
@@ -409,6 +410,11 @@ export default {
     
     // 启动处理流程
     const handleStartProcess = async () => {
+      // 取消之前的请求
+      if (cancelTokenRef.value) {
+        cancelTokenRef.value.abort();
+      }
+      
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
@@ -551,8 +557,15 @@ export default {
         
         showResults.value = true;
       } catch (error) {
-        console.error('处理失败:', error);
-        errorMessage.value = `处理失败: ${error.message || '未知错误'}`;
+        // 判断是否是取消的请求
+        if (axios.isCancel(error) || error.name === 'AbortError' || error.name === 'CanceledError') {
+          console.log('请求已取消');
+          // 不显示错误消息
+        } else {
+          console.error('处理失败:', error);
+          // 只在控制台输出错误，不直接显示给用户
+          errorMessage.value = '处理失败，请稍后重试';
+        }
       } finally {
         processingStatus.value = '';
         processingRef.value = false;

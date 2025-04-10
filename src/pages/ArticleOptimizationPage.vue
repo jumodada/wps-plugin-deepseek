@@ -1,5 +1,15 @@
 <template>
   <div class="optimization-container">
+    <!-- 文档变化提示 -->
+    <div v-if="documentChangeDetected && !loading" class="document-change-alert">
+      <span v-if="isSameAsPreviousDoc">检测到文档切换，依然是源文档"{{ newDocumentName }}"，是否要重新优化</span>
+      <span v-else>检测到文档已切换到"{{ newDocumentName }}"</span>
+      <div class="document-change-actions">
+        <span class="document-change-action" @click="handleReprocessDocument">重新处理</span>
+        <span class="document-change-action ignore" @click="ignoreDocumentChange">忽略</span>
+      </div>
+    </div>
+
     <div v-if="loading" class="overlay-container">
       <div class="progress-container">
         <p class="processing-title">文章处理中</p>
@@ -110,6 +120,12 @@ export default {
     const processComplete = ref(false);
     const lastCardRef = ref(null);
     const resultsContainer = ref(null);
+    
+    // 添加文档变化检测相关状态
+    const documentChangeDetected = ref(false);
+    const newDocumentName = ref('');
+    const previousProcessedDoc = ref(''); // 存储之前处理过的文档名称，单个字符串
+    const isSameAsPreviousDoc = ref(false); // 是否是切回了之前处理过的文档
     
     // 批量处理相关的状态变量
     const batchSize = ref(3); // 每批处理的段落数量
@@ -405,7 +421,7 @@ export default {
             break;
           }
         } catch (error) {
-          console.error('定位到段落时出错:', error);
+          // 静默处理定位到段落时出错
         }
       }
 
@@ -419,6 +435,11 @@ export default {
     
     // 启动处理流程
     const handleStartProcess = async () => {
+      // 取消之前的请求
+      if (cancelTokenRef.value) {
+        cancelTokenRef.value.abort();
+      }
+      
       // 先完全重置状态
       restoreOriginalStyle();
       activeCardId.value = null;
@@ -427,6 +448,7 @@ export default {
       replacedItems.value = new Set();
       processComplete.value = false;
       
+      // 重新创建AbortController
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
@@ -455,6 +477,12 @@ export default {
       }
 
       originalData.value = structuredData;
+      
+      // 在处理前记录当前文档名称
+      if (isWordDocument() && window.Application?.ActiveDocument?.Name) {
+        previousProcessedDoc.value = window.Application?.ActiveDocument?.Name;
+        activeDocumentName.value = previousProcessedDoc.value;
+      }
       
       // 分批处理段落
       const batches = [];
@@ -496,72 +524,98 @@ export default {
             }
           };
           
-          const response = await retryStreamOptimization(params);
-          
-          if (!processingRef.value) {
-            loading.value = false;
-            document.body.style.overflow = '';
-            return;
-          }
-          
-          if (!response?.data?.choices?.length) {
-            continue; // 跳过这一批次，继续处理下一批次
-          }
-          
-          const result = response.data.choices[0].message.content;
-          const jsonMatch = result.match(/(\[.*\])/s);
-          const jsonStr = jsonMatch ? jsonMatch[1] : result;
-          
-          // 解析返回的JSON
           try {
-            const resultData = JSON.parse(jsonStr);
-            if (Array.isArray(resultData)) {
-              // 处理返回的优化数据
-              const batchOptimizedData = updateOptimizedData(batches[i], resultData);
-              // 将这一批处理结果合并到总结果中
-              optimizedData.value = [...optimizedData.value, ...batchOptimizedData];
-              
-              // 获取每个文本段落的差异分析
-              const diffPromises = batchOptimizedData
-                .filter(item => !item.notImprove) // 只处理有变化的项目
-                .map(async (item) => {
-                  try {
-                    const diffResponse = await generateDiffAnalysis({
-                      original: item.originalText,
-                      optimized: item.text,
-                      signal: cancelTokenRef.value?.signal
-                    });
-                    
-                    if (diffResponse?.data?.choices?.length) {
-                      const diffResult = diffResponse.data.choices[0].message.content;
-                      const diffArray = JSON.parse(diffResult);
+            const response = await retryStreamOptimization(params);
+            
+            if (!processingRef.value) {
+              loading.value = false;
+              document.body.style.overflow = '';
+              return;
+            }
+            
+            if (!response?.data?.choices?.length) {
+              continue; // 跳过这一批次，继续处理下一批次
+            }
+            
+            const result = response.data.choices[0].message.content;
+            const jsonMatch = result.match(/(\[.*\])/s);
+            const jsonStr = jsonMatch ? jsonMatch[1] : result;
+            
+            // 解析返回的JSON
+            try {
+              const resultData = JSON.parse(jsonStr);
+              if (Array.isArray(resultData)) {
+                // 处理返回的优化数据
+                const batchOptimizedData = updateOptimizedData(batches[i], resultData);
+                // 将这一批处理结果合并到总结果中
+                optimizedData.value = [...optimizedData.value, ...batchOptimizedData];
+                
+                // 获取每个文本段落的差异分析
+                const diffPromises = batchOptimizedData
+                  .filter(item => !item.notImprove) // 只处理有变化的项目
+                  .map(async (item) => {
+                    try {
+                      const diffResponse = await generateDiffAnalysis({
+                        original: item.originalText,
+                        optimized: item.text,
+                        signal: cancelTokenRef.value?.signal
+                      });
                       
-                      // 更新对应项的diff属性
-                      if (Array.isArray(diffArray)) {
-                        const index = optimizedData.value.findIndex(opt => opt.id === item.id);
-                        if (index !== -1) {
-                          optimizedData.value[index].diff = diffArray;
+                      if (diffResponse?.data?.choices?.length) {
+                        const diffResult = diffResponse.data.choices[0].message.content;
+                        try {
+                          const diffArray = JSON.parse(diffResult);
+                          
+                          // 更新对应项的diff属性
+                          if (Array.isArray(diffArray)) {
+                            const index = optimizedData.value.findIndex(opt => opt.id === item.id);
+                            if (index !== -1) {
+                              optimizedData.value[index].diff = diffArray;
+                            }
+                          }
+                        } catch (diffError) {
+                          console.error('差异分析JSON解析失败:', diffError);
                         }
                       }
+                    } catch (e) {
+                      // 静默处理差异分析失败
+                      console.error('差异分析请求失败:', e.message || '未知错误');
                     }
-                  } catch (e) {
-                    console.error('获取差异分析失败:', e);
-                  }
-                });
-              
-              // 等待这一批的差异分析完成
-              await Promise.all(diffPromises);
-              
-              // 滚动到最新的卡片
-              scrollToLastCard();
+                  });
+                
+                // 等待这一批的差异分析完成
+                try {
+                  await Promise.all(diffPromises);
+                } catch (allError) {
+                  console.error('一批差异分析过程出错:', allError);
+                  // 继续处理，不中断
+                }
+                
+                // 滚动到最新的卡片
+                scrollToLastCard();
+              }
+            } catch (jsonError) {
+              // 静默处理API返回结果解析失败
+              console.error('API返回结果解析失败:', jsonError);
+              // 继续处理下一批数据
             }
-          } catch (e) {
-            console.error('解析API返回结果失败:', e);
+            
+            // 重置模拟进度，更新实际进度
+            simulatedProgress.value = 0;
+            processedBatches.value++;
+          } catch (batchError) {
+            // 检查是否是请求取消错误
+            if (batchError.name === 'AbortError' || batchError.name === 'CanceledError') {
+              console.log('批处理请求已取消');
+              break; // 跳出循环
+            }
+            
+            console.error('批处理失败:', batchError.message || '未知错误');
+            // 继续处理下一批数据，不中断整个流程
+            
+            // 更新进度
+            processedBatches.value++;
           }
-          
-          // 重置模拟进度，更新实际进度
-          simulatedProgress.value = 0;
-          processedBatches.value++;
         }
         
         // 所有批次处理完成
@@ -585,7 +639,7 @@ export default {
         // 恢复页面滚动
         document.body.style.overflow = '';
       } catch (error) {
-        console.error('处理失败:', error);
+        // 静默处理错误
         loading.value = false;
         
         // 恢复页面滚动
@@ -596,18 +650,32 @@ export default {
           clearInterval(progressInterval.value);
           progressInterval.value = null;
         }
-        
-        if (error.name !== 'AbortError') {
-          message.error('处理失败，请重试');
-        }
       }
+    };
+    
+    // 忽略文档变化
+    const ignoreDocumentChange = () => {
+      documentChangeDetected.value = false;
+      newDocumentName.value = '';
+      isSameAsPreviousDoc.value = false;
+      // 更新当前文档名称，避免再次触发变化
+      if (isWordDocument()) {
+        activeDocumentName.value = window.Application?.ActiveDocument?.Name;
+      }
+    };
+    
+    // 处理文档重新处理
+    const handleReprocessDocument = () => {
+      documentChangeDetected.value = false;
+      isSameAsPreviousDoc.value = false;
+      // 重新开始处理流程
+      handleStartProcess();
     };
     
     // 监听文档名称变化
     const checkDocumentName = () => {
       if (isWordDocument()) {
         const currentDocName = window.Application?.ActiveDocument?.Name;
-        
         // 检查store中的documentChanged标志
         if (mainStore.documentChanged) {
           // 检查文档名称是否真的变化了
@@ -615,11 +683,24 @@ export default {
             // 重置标志
             mainStore.setDocumentChanged(false);
             
-            // 更新文档名称
-            activeDocumentName.value = currentDocName;
+            // 检查是否是切回了之前处理过的文档
+            isSameAsPreviousDoc.value = previousProcessedDoc.value === currentDocName;
             
-            // 重新开始处理流程
-            handleStartProcess();
+            // 如果正在加载，取消当前请求并立即处理
+            if (loading.value) {
+              if (cancelTokenRef.value) {
+                cancelTokenRef.value.abort();
+                processingRef.value = false;
+              }
+              // 更新文档名称
+              activeDocumentName.value = currentDocName;
+              // 重新开始处理流程
+              handleStartProcess();
+            } else {
+              // 显示文档变化提示
+              newDocumentName.value = currentDocName;
+              documentChangeDetected.value = true;
+            }
           } else {
             // 文档名称没有变化，只重置标志
             mainStore.setDocumentChanged(false);
@@ -629,9 +710,23 @@ export default {
         
         // 原有的文档名称检查逻辑
         if (activeDocumentName.value !== currentDocName) {
-          activeDocumentName.value = currentDocName;
-          if (activeDocumentName.value !== null) { // 不是首次设置才重新处理
-            handleStartProcess();
+          // 检查是否是切回了之前处理过的文档
+          isSameAsPreviousDoc.value = previousProcessedDoc.value === currentDocName;
+          
+          // 如果正在加载，取消当前请求并立即处理
+          if (loading.value) {
+            if (cancelTokenRef.value) {
+              cancelTokenRef.value.abort();
+              processingRef.value = false;
+            }
+            activeDocumentName.value = currentDocName;
+            if (activeDocumentName.value !== null) { // 不是首次设置才重新处理
+              handleStartProcess();
+            }
+          } else {
+            // 显示文档变化提示
+            newDocumentName.value = currentDocName;
+            documentChangeDetected.value = true;
           }
         }
       }
@@ -703,7 +798,13 @@ export default {
       progressPercentage,
       processComplete,
       lastCardRef,
-      resultsContainer
+      resultsContainer,
+      // 添加文档变化检测相关变量
+      documentChangeDetected,
+      newDocumentName,
+      handleReprocessDocument,
+      ignoreDocumentChange,
+      isSameAsPreviousDoc
     };
   }
 };
@@ -721,6 +822,44 @@ export default {
   color: #333;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   position: relative;
+}
+
+/* 文档变化提示样式 */
+.document-change-alert {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: #fffbe6;
+  border: 1px solid #ffe58f;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.document-change-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.document-change-action {
+  cursor: pointer;
+  color: #1890ff;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.document-change-action:hover {
+  background-color: rgba(24, 144, 255, 0.1);
+}
+
+.document-change-action.ignore {
+  color: #999;
 }
 
 .overlay-container {

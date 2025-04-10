@@ -465,7 +465,7 @@ export default {
             break;
           }
         } catch (error) {
-          console.error('定位到段落时出错:', error);
+          // 静默处理定位到段落时出错
         }
       }
 
@@ -581,15 +581,14 @@ export default {
 
                 resolve(correctionResults);
               } catch (error) {
-                console.error('Error parsing correction data:', error);
+                // 静默处理解析错误
                 reject(error);
               }
             }
           });
         });
       } catch (error) {
-        console.error('Error fetching correction data:', error);
-        message.error('获取纠错数据失败，请重试');
+        // 静默处理请求错误
         return [];
       }
     };
@@ -683,7 +682,7 @@ export default {
         // 滚动到顶部
         scrollToTop();
       } catch (error) {
-        console.error('处理失败:', error);
+        // 静默处理错误
         loading.value = false;
         processingBatchInfo.value = '';
         
@@ -694,10 +693,6 @@ export default {
         if (progressInterval.value) {
           clearInterval(progressInterval.value);
           progressInterval.value = null;
-        }
-        
-        if (error.name !== 'AbortError') {
-          message.error('处理失败，请重试');
         }
       }
     };
