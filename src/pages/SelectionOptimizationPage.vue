@@ -456,10 +456,19 @@ export default {
       
       processingStatus.value = '正在优化内容...';
 
+      // 获取整个文档内容作为大纲
+      let documentOutline = '';
+      try {
+        documentOutline = window.Application.ActiveDocument.Content.Text;
+      } catch (error) {
+        console.error('获取文档大纲失败:', error);
+      }
+
       // 准备用于API的数据格式
       const dataForDeepseek = {
         paraID: selectedText.id,
-        text: selectedText.text
+        text: selectedText.text,
+        documentOutline: documentOutline  // 添加文档大纲
       };
       
       // 重置错误消息
@@ -474,7 +483,7 @@ export default {
           },
           {
             role: "user",
-            content: `请对以下JSON格式内容进行词语级别的优化，返回优化后相同格式的JSON。仅替换需要改进的个别词语，保持整体结构不变：\n\n${JSON.stringify(dataForDeepseek)}`
+            content: `请对以下JSON格式内容进行词语级别的优化，返回优化后相同格式的JSON。仅替换需要改进的个别词语，保持整体结构不变。我提供了documentOutline作为整个文档的大纲，请参考它以更精准地理解上下文：\n\n${JSON.stringify(dataForDeepseek)}`
           }
         ],
         model: "qwen-plus",

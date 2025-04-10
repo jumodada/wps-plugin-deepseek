@@ -2,7 +2,7 @@
   <div class="optimization-container">
     <!-- 文档变化提示 -->
     <div v-if="documentChangeDetected && !loading" class="document-change-alert">
-      <span v-if="isSameAsPreviousDoc">检测到文档切换，依然是源文档"{{ newDocumentName }}"，是否要重新优化</span>
+      <span v-if="previousProcessedDoc === newDocumentName">检测到文档切换，依然是源文档"{{ newDocumentName }}"，是否要重新优化</span>
       <span v-else>检测到文档已切换到"{{ newDocumentName }}"</span>
       <div class="document-change-actions">
         <span class="document-change-action" @click="handleReprocessDocument">重新处理</span>
@@ -448,11 +448,15 @@ export default {
       replacedItems.value = new Set();
       processComplete.value = false;
       
+      if (isWordDocument() && window.Application?.ActiveDocument?.Name) {
+        activeDocumentName.value = previousProcessedDoc.value;
+      }
+      
       // 重新创建AbortController
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
-
+      previousProcessedDoc.value = window.Application?.ActiveDocument?.Name;
       // 禁止页面滚动
       document.body.style.overflow = 'hidden';
 
@@ -477,12 +481,6 @@ export default {
       }
 
       originalData.value = structuredData;
-      
-      // 在处理前记录当前文档名称
-      if (isWordDocument() && window.Application?.ActiveDocument?.Name) {
-        previousProcessedDoc.value = window.Application?.ActiveDocument?.Name;
-        activeDocumentName.value = previousProcessedDoc.value;
-      }
       
       // 分批处理段落
       const batches = [];
@@ -676,6 +674,10 @@ export default {
     const checkDocumentName = () => {
       if (isWordDocument()) {
         const currentDocName = window.Application?.ActiveDocument?.Name;
+        
+        // 始终更新newDocumentName为当前文档名称
+        newDocumentName.value = currentDocName;
+        
         // 检查store中的documentChanged标志
         if (mainStore.documentChanged) {
           // 检查文档名称是否真的变化了
@@ -683,7 +685,8 @@ export default {
             // 重置标志
             mainStore.setDocumentChanged(false);
             
-            // 检查是否是切回了之前处理过的文档
+            // 检查当前文档是否是原始处理的文档
+            // previousProcessedDoc代表与当前卡片关联的原始文档
             isSameAsPreviousDoc.value = previousProcessedDoc.value === currentDocName;
             
             // 如果正在加载，取消当前请求并立即处理
@@ -698,7 +701,6 @@ export default {
               handleStartProcess();
             } else {
               // 显示文档变化提示
-              newDocumentName.value = currentDocName;
               documentChangeDetected.value = true;
             }
           } else {
@@ -710,7 +712,7 @@ export default {
         
         // 原有的文档名称检查逻辑
         if (activeDocumentName.value !== currentDocName) {
-          // 检查是否是切回了之前处理过的文档
+          // 检查当前文档是否是原始处理的文档
           isSameAsPreviousDoc.value = previousProcessedDoc.value === currentDocName;
           
           // 如果正在加载，取消当前请求并立即处理
@@ -725,7 +727,6 @@ export default {
             }
           } else {
             // 显示文档变化提示
-            newDocumentName.value = currentDocName;
             documentChangeDetected.value = true;
           }
         }
@@ -794,6 +795,7 @@ export default {
       handleReplaceItem,
       handleIgnoreItem,
       goBack,
+      previousProcessedDoc,
       cardRefs,
       progressPercentage,
       processComplete,
