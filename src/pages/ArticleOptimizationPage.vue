@@ -1,5 +1,14 @@
 <template>
   <div class="optimization-container">
+    <!-- 顶部添加停止处理的提示 -->
+    <div v-if="processingCancelled && !loading && !documentChangeDetected" class="document-change-alert">
+      <span>您已停止处理</span>
+      <div class="document-change-actions">
+        <span class="document-change-action" @click="handleStartProcess">重新开始</span>
+        <span class="document-change-action ignore" @click="ignoreProcessingCancelled">忽略</span>
+      </div>
+    </div>
+
     <!-- 文档变化提示 -->
     <div v-if="documentChangeDetected && !loading" class="document-change-alert">
       <span v-if="previousProcessedDoc === newDocumentName">检测到文档切换，依然是源文档"{{ newDocumentName }}"，是否要重新优化</span>
@@ -17,6 +26,8 @@
           <div class="progress-inner" :style="{ width: `${progressPercentage}%` }"></div>
         </div>
         <p class="progress-percentage">{{ Math.round(progressPercentage) }}%</p>
+        <!-- 添加停止按钮 -->
+        <button class="stop-button" @click="handleStopProcessing">停止</button>
       </div>
     </div>
     
@@ -137,6 +148,9 @@ export default {
     const progress = ref(0);
     const simulatedProgress = ref(0);
     const progressInterval = ref(null);
+    
+    // 添加停止处理相关状态变量
+    const processingCancelled = ref(false);
     
     // 计算进度百分比
     const progressPercentage = computed(() => {
@@ -447,6 +461,7 @@ export default {
       optimizedData.value = []; // 清空优化结果
       replacedItems.value = new Set();
       processComplete.value = false;
+      processingCancelled.value = false; // 重置处理取消状态
       
       if (isWordDocument() && window.Application?.ActiveDocument?.Name) {
         activeDocumentName.value = previousProcessedDoc.value;
@@ -733,6 +748,38 @@ export default {
       }
     };
     
+    // 添加点击停止处理的处理函数
+    const handleStopProcessing = () => {
+      // 中断当前请求
+      if (cancelTokenRef.value) {
+        cancelTokenRef.value.abort();
+      }
+      
+      // 停止进度模拟
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+        progressInterval.value = null;
+      }
+      
+      // 更新状态
+      processingRef.value = false;
+      loading.value = false;
+      processingCancelled.value = true;
+      
+      // 恢复页面滚动
+      document.body.style.overflow = '';
+      
+      // 如果当前没有可显示的结果，显示空结果
+      if (filteredData.value.length === 0 && replacedItems.value.size === 0) {
+        processComplete.value = true;
+      }
+    };
+    
+    // 忽略处理取消提示
+    const ignoreProcessingCancelled = () => {
+      processingCancelled.value = false;
+    };
+    
     let intervalId = null;
     
     onMounted(() => {
@@ -806,7 +853,11 @@ export default {
       newDocumentName,
       handleReprocessDocument,
       ignoreDocumentChange,
-      isSameAsPreviousDoc
+      isSameAsPreviousDoc,
+      // 添加停止处理相关变量
+      processingCancelled,
+      handleStopProcessing,
+      ignoreProcessingCancelled
     };
   }
 };
@@ -915,6 +966,29 @@ export default {
   color: #333;
   font-size: 18px;
   font-weight: bold;
+}
+
+/* 添加停止按钮样式 */
+.stop-button {
+  margin-top: 15px;
+  padding: 6px 15px;
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.stop-button:hover {
+  background-color: #ff7875;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.stop-button:active {
+  background-color: #d9363e;
 }
 
 .results-container {

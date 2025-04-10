@@ -1,5 +1,24 @@
 <template>
   <div class="correction-container">
+    <!-- 停止处理的提示 -->
+    <div v-if="processingCancelled && !loading && !documentChangeDetected" class="document-change-alert">
+      <span>您已停止处理</span>
+      <div class="document-change-actions">
+        <span class="document-change-action" @click="handleStartProcess">重新开始</span>
+        <span class="document-change-action ignore" @click="ignoreProcessingCancelled">忽略</span>
+      </div>
+    </div>
+
+    <!-- 文档变化提示 -->
+    <div v-if="documentChangeDetected && !loading" class="document-change-alert">
+      <span v-if="previousProcessedDoc === newDocumentName">检测到文档切换，依然是源文档"{{ newDocumentName }}"，是否要重新优化</span>
+      <span v-else>检测到文档已切换到"{{ newDocumentName }}"</span>
+      <div class="document-change-actions">
+        <span class="document-change-action" @click="handleReprocessDocument">重新处理</span>
+        <span class="document-change-action ignore" @click="ignoreDocumentChange">忽略</span>
+      </div>
+    </div>
+
     <!-- 添加初审/复审的Tab组件 -->
     <div class="review-tabs" v-if="!loading">
       <div class="tabs-wrapper">
@@ -46,6 +65,8 @@
         </div>
         <p class="progress-percentage">{{ Math.round(progressPercentage) }}%</p>
         <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
+        <!-- 添加停止按钮 -->
+        <button class="stop-button" @click="handleStopProcessing">停止</button>
       </div>
     </div>
     
@@ -192,6 +213,15 @@ export default {
     const hasUnresolvedInitialItems = computed(() => {
       return reviewType.value === 'initial' && filteredData.value.length > 0;
     });
+
+    // 添加停止处理相关状态变量
+    const processingCancelled = ref(false);
+
+    // 添加文档变化检测相关状态
+    const documentChangeDetected = ref(false);
+    const newDocumentName = ref('');
+    const previousProcessedDoc = ref(''); // 存储之前处理过的文档名称，单个字符串
+    const isSameAsPreviousDoc = ref(false); // 是否是切回了之前处理过的文档
 
     // Tab切换处理
     const handleSwitchTab = (type) => {
@@ -602,12 +632,21 @@ export default {
       originalData.value = []; // 清空原始数据
       replacedItems.value = new Set();
       processComplete.value = false;
+      processingCancelled.value = false; // 重置处理取消状态
+      documentChangeDetected.value = false; // 重置文档变化检测状态
+
+      // 重置审核状态
+      initialReviewCompleted.value = false;
+      secondReviewCompleted.value = false;
+      reviewType.value = 'initial';
+      canSwitchToInitial.value = true;
 
       // 然后执行原有的处理流程
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
       showResults.value = true; // 确保显示结果容器
+      previousProcessedDoc.value = window.Application?.ActiveDocument?.Name; // 记录当前处理的文档名称
 
       // 禁止页面滚动
       document.body.style.overflow = 'hidden';
@@ -702,6 +741,9 @@ export default {
       if (isWordDocument()) {
         const currentDocName = window.Application?.ActiveDocument?.Name;
         
+        // 始终更新newDocumentName为当前文档名称
+        newDocumentName.value = currentDocName;
+        
         // 检查store中的documentChanged标志
         if (mainStore.documentChanged) {
           // 检查文档名称是否真的变化了
@@ -709,17 +751,24 @@ export default {
             // 重置标志
             mainStore.setDocumentChanged(false);
             
-            // 更新文档名称
-            activeDocumentName.value = currentDocName;
+            // 检查当前文档是否是原始处理的文档
+            // previousProcessedDoc代表与当前卡片关联的原始文档
+            isSameAsPreviousDoc.value = previousProcessedDoc.value === currentDocName;
             
-            // 新文档重置所有状态
-            initialReviewCompleted.value = false;
-            secondReviewCompleted.value = false;
-            reviewType.value = 'initial';
-            canSwitchToInitial.value = true;
-            
-            // 重新开始处理流程
-            handleStartProcess();
+            // 如果正在加载，取消当前请求并立即处理
+            if (loading.value) {
+              if (cancelTokenRef.value) {
+                cancelTokenRef.value.abort();
+                processingRef.value = false;
+              }
+              // 更新文档名称
+              activeDocumentName.value = currentDocName;
+              // 重新开始处理流程
+              handleStartProcess();
+            } else {
+              // 显示文档变化提示
+              documentChangeDetected.value = true;
+            }
           } else {
             // 文档名称没有变化，只重置标志
             mainStore.setDocumentChanged(false);
@@ -729,15 +778,20 @@ export default {
         
         // 原有的文档名称检查逻辑
         if (activeDocumentName.value !== currentDocName) {
-          // 新文档重置所有状态
-          activeDocumentName.value = currentDocName;
-          initialReviewCompleted.value = false;
-          secondReviewCompleted.value = false;
-          reviewType.value = 'initial';
-          canSwitchToInitial.value = true;
+          // 检查当前文档是否是原始处理的文档
+          isSameAsPreviousDoc.value = previousProcessedDoc.value === currentDocName;
           
-          if (activeDocumentName.value !== null) { // 不是首次设置才重新处理
+          // 如果正在加载，取消当前请求并立即处理
+          if (loading.value) {
+            if (cancelTokenRef.value) {
+              cancelTokenRef.value.abort();
+              processingRef.value = false;
+            }
+            activeDocumentName.value = currentDocName;
             handleStartProcess();
+          } else {
+            // 显示文档变化提示
+            documentChangeDetected.value = true;
           }
         }
       }
@@ -789,6 +843,57 @@ export default {
       previousActiveCardId.value = newVal;
     });
     
+    // 添加点击停止处理的处理函数
+    const handleStopProcessing = () => {
+      // 中断当前请求
+      if (cancelTokenRef.value) {
+        cancelTokenRef.value.abort();
+      }
+      
+      // 停止进度模拟
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+        progressInterval.value = null;
+      }
+      
+      // 更新状态
+      processingRef.value = false;
+      loading.value = false;
+      processingCancelled.value = true;
+      
+      // 恢复页面滚动
+      document.body.style.overflow = '';
+      
+      // 显示已有的结果
+      if (correctionData.value.length === 0) {
+        processComplete.value = true;
+      }
+    };
+
+    // 忽略处理取消提示
+    const ignoreProcessingCancelled = () => {
+      processingCancelled.value = false;
+    };
+
+    // 忽略文档变化
+    const ignoreDocumentChange = () => {
+      documentChangeDetected.value = false;
+      newDocumentName.value = '';
+      isSameAsPreviousDoc.value = false;
+      // 更新当前文档名称，避免再次触发变化
+      if (isWordDocument()) {
+        activeDocumentName.value = window.Application?.ActiveDocument?.Name;
+      }
+    };
+
+    // 处理文档重新处理
+    const handleReprocessDocument = () => {
+      documentChangeDetected.value = false;
+      isSameAsPreviousDoc.value = false;
+      // 重新开始处理流程
+      handleStartProcess();
+    };
+
     return {
       // 审核相关状态
       reviewType,
@@ -818,7 +923,21 @@ export default {
       handleStartProcess,
       processingBatchInfo,
       lastCardRef,
-      resultsContainer
+      resultsContainer,
+      hasUnresolvedInitialItems,
+      
+      // 添加停止处理相关变量
+      processingCancelled,
+      handleStopProcessing,
+      ignoreProcessingCancelled,
+      
+      // 添加文档变化检测相关变量
+      documentChangeDetected,
+      newDocumentName,
+      handleReprocessDocument,
+      ignoreDocumentChange,
+      previousProcessedDoc,
+      isSameAsPreviousDoc
     };
   }
 };
@@ -836,6 +955,45 @@ export default {
   background-color: #f0f2f5;
   color: #333;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  position: relative;
+}
+
+/* 停止处理提示样式 */
+.document-change-alert {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background-color: #fffbe6;
+  border: 1px solid #ffe58f;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  z-index: 10;
+}
+
+.document-change-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.document-change-action {
+  cursor: pointer;
+  color: #1890ff;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.document-change-action:hover {
+  background-color: rgba(24, 144, 255, 0.1);
+}
+
+.document-change-action.ignore {
+  color: #999;
 }
 
 /* 添加Tab样式 */
@@ -976,9 +1134,32 @@ export default {
 }
 
 .processing-status {
-  margin-top: 15px;
-  color: #666;
+  margin-top: 10px;
+  color: #777;
   font-size: 14px;
+}
+
+/* 添加停止按钮样式 */
+.stop-button {
+  margin-top: 15px;
+  padding: 6px 15px;
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.stop-button:hover {
+  background-color: #ff7875;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.stop-button:active {
+  background-color: #d9363e;
 }
 
 .loading-container {

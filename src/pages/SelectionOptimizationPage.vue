@@ -1,5 +1,14 @@
 <template>
   <div class="optimization-container">
+    <!-- 停止处理的提示 -->
+    <div v-if="processingCancelled && !loading && !textChangeDetected" class="text-change-alert">
+      <span>您已停止处理</span>
+      <div class="text-change-actions">
+        <span class="text-change-action" @click="handleStartProcess">重新开始</span>
+        <span class="text-change-action ignore" @click="ignoreProcessingCancelled">忽略</span>
+      </div>
+    </div>
+    
     <!-- 文本变化提示 -->
     <div v-if="textChangeDetected && !loading" class="text-change-alert">
       <span>检测到选中文本已变化</span>
@@ -12,6 +21,8 @@
     <div v-if="loading" class="loading-container">
       <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
       <div class="spinner"></div>
+      <!-- 添加停止按钮 -->
+      <button class="stop-button" @click="handleStopProcessing">停止</button>
     </div>
     
     <div v-else-if="showResults" class="results-container">
@@ -94,6 +105,7 @@ export default {
     const currentSelectionText = ref(''); // 存储当前选中的文本
     const textChangeDetected = ref(false); // 添加文本变化检测状态
     const newSelectionText = ref(''); // 存储新检测到的文本
+    const processingCancelled = ref(false); // 添加停止处理状态
     
     // 计算属性 - 是否已替换
     const isReplaced = computed(() => {
@@ -418,6 +430,7 @@ export default {
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
+      processingCancelled.value = false; // 重置处理取消状态
 
       if (!isWordDocument()) {
         alert('无法访问Word文档，请确保文档已打开');
@@ -599,6 +612,29 @@ export default {
       }
     };
     
+    // 添加点击停止处理的处理函数
+    const handleStopProcessing = () => {
+      // 中断当前请求
+      if (cancelTokenRef.value) {
+        cancelTokenRef.value.abort();
+      }
+      
+      // 更新状态
+      processingRef.value = false;
+      loading.value = false;
+      processingCancelled.value = true;
+      
+      // 如果没有结果，至少显示结果容器
+      if (!originalItem.value || !optimizedItem.value) {
+        showResults.value = true;
+      }
+    };
+    
+    // 忽略处理取消提示
+    const ignoreProcessingCancelled = () => {
+      processingCancelled.value = false;
+    };
+    
     onMounted(() => {
       // 启动处理
       handleStartProcess();
@@ -638,7 +674,11 @@ export default {
       getHighlightedText,
       textChangeDetected,
       handleReOptimize,
-      ignoreTextChange
+      ignoreTextChange,
+      // 添加停止处理相关变量
+      processingCancelled,
+      handleStopProcessing,
+      ignoreProcessingCancelled
     };
   }
 };
@@ -878,5 +918,20 @@ export default {
 
 .result-card.error {
   border-left: 3px solid #ff4d4f;
+}
+
+.stop-button {
+  background-color: #ff4d4f;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 20px;
+}
+
+.stop-button:hover {
+  background-color: #e84d4f;
 }
 </style>
