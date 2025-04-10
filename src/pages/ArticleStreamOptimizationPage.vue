@@ -79,15 +79,19 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { submitStreamOptimization, generateDiffAnalysis, getDocumentTokenEstimation, parseStreamContent } from '../api/deepseek';
 import { isWordDocument, prepareDataForDeepseek, buildOptimizationMessages, updateOptimizedData, replaceParagraphInDocument } from '../tool/optimization';
 import { handleStreamResponse } from '../services/request';
+import { useMainStore } from '../services/store'; // 导入store
 
 export default {
   name: 'ArticleStreamOptimizationPage',
   setup() {
+    // 获取store实例
+    const store = useMainStore();
+    
     // 状态变量
     const loading = ref(false);
     const processingStatus = ref('');
@@ -763,6 +767,40 @@ export default {
         }
       }
     };
+    
+    // 监听store中的documentChanged变化
+    watch(() => store.documentChanged, (newValue) => {
+      if (newValue === true) {
+        console.log('检测到文档变化，重置处理并重新开始');
+        message.info('文档已切换，正在重新加载内容');
+        
+        // 重置处理
+        resetProcess();
+        
+        // 取消正在进行的请求
+        if (cancelTokenRef.value) {
+          cancelTokenRef.value.abort();
+        }
+        
+        // 重置加载状态
+        loading.value = false;
+        processingStatus.value = '';
+        
+        // 检查文档是否就绪
+        if (checkDocumentReady()) {
+          // 更新文档名称
+          activeDocumentName.value = window.Application.ActiveDocument?.Name;
+          
+          // 延迟一点时间再开始处理，确保文档已完全加载
+          setTimeout(() => {
+            startProcess();
+          }, 1000);
+        }
+        
+        // 重置文档变化标志
+        store.setDocumentChanged(false);
+      }
+    });
     
     let intervalId = null;
     

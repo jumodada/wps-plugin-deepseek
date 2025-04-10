@@ -7,7 +7,8 @@ export const useMainStore = defineStore('main', {
     token: null,
     loading: false,
     data: null,
-    wps: null
+    wps: null,
+    documentChanged: false
   }),
   
   actions: {
@@ -25,6 +26,9 @@ export const useMainStore = defineStore('main', {
     },
     setWps(wps) {
       this.wps = wps;
+    },
+    setDocumentChanged(changed) {
+      this.documentChanged = changed;
     }
   },
 

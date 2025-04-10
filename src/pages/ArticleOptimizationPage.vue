@@ -78,16 +78,21 @@ import {
   extractParagraphsFromDocument, 
   handleImageLineBreak, 
   retryOptimization,
+  retryStreamOptimization,
   prepareDataForDeepseek,
   updateOptimizedData,
   replaceParagraphInDocument,
   buildOptimizationMessages
 } from '../tool/optimization';
 import { message } from 'ant-design-vue';
+import { useMainStore } from '../services/store';
 
 export default {
   name: 'ArticleOptimizationPage',
   setup() {
+    // 获取Pinia store
+    const mainStore = useMainStore();
+    
     // 状态变量
     const loading = ref(false);
     const processingStatus = ref('');
@@ -414,17 +419,24 @@ export default {
     
     // 启动处理流程
     const handleStartProcess = async () => {
+      // 先完全重置状态
+      restoreOriginalStyle();
+      activeCardId.value = null;
+      originalData.value = []; // 清空原始数据
+      optimizedData.value = []; // 清空优化结果
+      replacedItems.value = new Set();
+      processComplete.value = false;
+      
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
-      optimizedData.value = []; // 清空优化结果
-      processComplete.value = false;
-      
+
       // 禁止页面滚动
       document.body.style.overflow = 'hidden';
 
       if (!isWordDocument()) {
         loading.value = false;
+        document.body.style.overflow = '';
         return;
       }
 
@@ -473,14 +485,18 @@ export default {
           // 构建优化API的消息提示
           const optimizationMessages = buildOptimizationMessages(dataForDeepseek);
           
-          // 调用API进行文本优化
+          // 调用API进行文本优化 - 使用流式请求
           const params = {
             messages: optimizationMessages,
             model: "deepseek-reasoner",
-            signal: cancelTokenRef.value?.signal
+            signal: cancelTokenRef.value?.signal,
+            onData: (data) => {
+              // 可以在这里处理流式返回的每一块数据，更新进度或显示部分结果
+              // console.log('收到流式数据:', data);
+            }
           };
           
-          const response = await retryOptimization(params);
+          const response = await retryStreamOptimization(params);
           
           if (!processingRef.value) {
             loading.value = false;
@@ -591,6 +607,27 @@ export default {
     const checkDocumentName = () => {
       if (isWordDocument()) {
         const currentDocName = window.Application?.ActiveDocument?.Name;
+        
+        // 检查store中的documentChanged标志
+        if (mainStore.documentChanged) {
+          // 检查文档名称是否真的变化了
+          if (activeDocumentName.value !== currentDocName) {
+            // 重置标志
+            mainStore.setDocumentChanged(false);
+            
+            // 更新文档名称
+            activeDocumentName.value = currentDocName;
+            
+            // 重新开始处理流程
+            handleStartProcess();
+          } else {
+            // 文档名称没有变化，只重置标志
+            mainStore.setDocumentChanged(false);
+          }
+          return;
+        }
+        
+        // 原有的文档名称检查逻辑
         if (activeDocumentName.value !== currentDocName) {
           activeDocumentName.value = currentDocName;
           if (activeDocumentName.value !== null) { // 不是首次设置才重新处理

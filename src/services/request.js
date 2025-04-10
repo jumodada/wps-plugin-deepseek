@@ -63,6 +63,100 @@ apiClient.interceptors.response.use(
 );
 
 /**
+ * 基于fetch的流式请求函数
+ * @param {string} url - 请求URL
+ * @param {Object} options - 请求选项
+ * @param {Object} options.body - 请求体
+ * @param {AbortSignal} options.signal - 中止信号
+ * @param {Function} options.onData - 数据回调函数
+ * @param {Function} options.onError - 错误回调函数
+ * @param {Function} options.onComplete - 完成回调函数
+ * @returns {Promise} - 返回处理结果的Promise
+ */
+export function fetchStreamRequest(url, options = {}) {
+  const { body, signal, onData, onError, onComplete } = options;
+  const store = useMainStore();
+  store.setLoading(true);
+  
+  const fetchUrl = apiClient.defaults.baseURL + url;
+  
+  return fetch(fetchUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${import.meta.env.VITE_DEEPSEEK_API_KEY || ''}`
+    },
+    body: JSON.stringify(body),
+    signal: signal
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`请求失败: ${response.status} ${response.statusText}`);
+      }
+      
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulated = '';
+      
+      function processStream() {
+        return reader.read().then(({ done, value }) => {
+          if (done) {
+            store.setLoading(false);
+            if (onComplete) onComplete(accumulated);
+            return accumulated;
+          }
+          
+          // 解码二进制数据
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          
+          // 处理SSE格式的数据
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // 保留最后一个不完整的行
+          
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            if (line.startsWith('data: ')) {
+              const data = line.substring(6);
+              if (data === '[DONE]') {
+                store.setLoading(false);
+                if (onComplete) onComplete(accumulated);
+                return accumulated;
+              }
+              
+              try {
+                const parsedData = JSON.parse(data);
+                accumulated += parsedData.choices?.[0]?.delta?.content || '';
+                if (onData) onData(parsedData, accumulated);
+              } catch (e) {
+                console.error('解析流式数据失败:', e);
+              }
+            }
+          }
+          
+          // 继续读取流
+          return processStream();
+        });
+      }
+      
+      return processStream();
+    })
+    .catch(error => {
+      store.setLoading(false);
+      // 检查是否是取消请求的错误
+      if (error.name === 'AbortError') {
+        console.log('请求被取消');
+        return Promise.reject(error);
+      }
+      
+      if (onError) onError(error);
+      message.error(error.message || '请求失败');
+      return Promise.reject(error);
+    });
+}
+
+/**
  * 处理流式响应
  * @param {Response} response - 流式响应对象
  * @param {Function} onData - 数据回调函数

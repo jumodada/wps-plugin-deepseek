@@ -129,13 +129,17 @@ import {
   handleImageLineBreak, 
   replaceParagraphInDocument,
   prepareDataForDeepseek,
-  retryOptimization
+  retryStreamWordCorrection
 } from '../tool/optimization';
 import { message } from 'ant-design-vue';
+import { useMainStore } from '../services/store';
 
 export default {
   name: 'WordCorrectionPage',
   setup() {
+    // 获取Pinia store
+    const mainStore = useMainStore();
+    
     // 审核相关状态变量
     const reviewType = ref('initial'); // 'initial' 或 'second'
     const initialReviewCompleted = ref(false);
@@ -166,23 +170,15 @@ export default {
     const resultsContainer = ref(null);
     
     // 批量处理相关的状态变量
-    const batchSize = ref(5); // 每批处理的段落数量
-    const currentBatch = ref(0);
-    const totalBatches = ref(0);
-    const processedBatches = ref(0);
     
     // 进度条相关
     const progress = ref(0);
-    const simulatedProgress = ref(0);
     const progressInterval = ref(null);
     
     // 计算进度百分比
     const progressPercentage = computed(() => {
-      if (totalBatches.value === 0) return 0;
-      // 真实进度 + 模拟进度
-      const realProgress = (processedBatches.value / totalBatches.value) * 100;
-      const simulated = simulatedProgress.value / totalBatches.value;
-      return Math.min(Math.max(realProgress + simulated, 0), 100);
+      // 直接使用progress值，处理完成时设为100%
+      return processComplete.value ? 100 : Math.min(Math.max(progress.value, 0), 100);
     });
     
     // 计算属性 - 过滤需要展示的数据
@@ -267,20 +263,23 @@ export default {
         clearInterval(progressInterval.value);
       }
       
-      simulatedProgress.value = 0;
+      progress.value = 0;
       
       // 设置新的定时器，每100ms增加一点模拟进度，使进度更平滑
       progressInterval.value = setInterval(() => {
-        if (processedBatches.value < totalBatches.value) {
-          // 模拟进度增量，但确保不会超过下一个真实批次的进度
-          const maxSimulation = 0.95; // 最大模拟到下一批次的95%
-          const increment = 0.1; // 每次增加的进度更小，使过渡更平滑
-          
-          if (simulatedProgress.value < maxSimulation) {
-            simulatedProgress.value += increment;
-          }
+        // 进度增量，模拟处理过程
+        const maxProgress = 95; // 最大模拟进度到95%，留5%给实际完成
+        const slowDownThreshold = 70; // 到70%后放慢速度
+        
+        let increment = 0.5;
+        if (progress.value > slowDownThreshold) {
+          increment = 0.2; // 放慢速度
+        }
+        
+        if (progress.value < maxProgress) {
+          progress.value += increment;
         } else {
-          // 处理完成，清除定时器
+          // 达到最大模拟进度，等待实际处理完成
           clearInterval(progressInterval.value);
           progressInterval.value = null;
         }
@@ -548,32 +547,46 @@ export default {
           }
         ];
 
-        // 调用API进行词语纠错
-        const params = {
-          messages: correctionMessages,
-          model: "deepseek-reasoner",
-          signal: cancelTokenRef.value?.signal
-        };
+        // 调用API进行词语纠错 - 使用流式请求
+        return new Promise((resolve, reject) => {
+          let accumulatedData = '';
+          
+          retryStreamWordCorrection({
+            messages: correctionMessages,
+            signal: cancelTokenRef.value?.signal,
+            onData: (chunk, accumulated) => {
+              accumulatedData = accumulated;
+            },
+            onError: (error) => {
+              console.error('Error fetching correction data:', error);
+              reject(error);
+            },
+            onComplete: (response) => {
+              try {
+                if (!response?.data?.choices?.length) {
+                  throw new Error('Failed to fetch correction data');
+                }
 
-        const response = await retryOptimization(params);
+                const result = response.data.choices[0].message.content;
+                const jsonMatch = result.match(/(\[.*\])/s);
+                const jsonStr = jsonMatch ? jsonMatch[1] : result;
+                
+                // 解析返回的JSON
+                const correctionResults = JSON.parse(jsonStr);
+                
+                // 确保返回的是数组
+                if (!Array.isArray(correctionResults)) {
+                  throw new Error('Invalid response format');
+                }
 
-        if (!response?.data?.choices?.length) {
-          throw new Error('Failed to fetch correction data');
-        }
-
-        const result = response.data.choices[0].message.content;
-        const jsonMatch = result.match(/(\[.*\])/s);
-        const jsonStr = jsonMatch ? jsonMatch[1] : result;
-        
-        // 解析返回的JSON
-        const correctionResults = JSON.parse(jsonStr);
-        
-        // 确保返回的是数组
-        if (!Array.isArray(correctionResults)) {
-          throw new Error('Invalid response format');
-        }
-
-        return correctionResults;
+                resolve(correctionResults);
+              } catch (error) {
+                console.error('Error parsing correction data:', error);
+                reject(error);
+              }
+            }
+          });
+        });
       } catch (error) {
         console.error('Error fetching correction data:', error);
         message.error('获取纠错数据失败，请重试');
@@ -583,10 +596,11 @@ export default {
     
     // 启动处理流程
     const handleStartProcess = async () => {
-      // 先执行返回操作的功能
+      // 先完全重置状态
       restoreOriginalStyle();
       activeCardId.value = null;
       correctionData.value = [];
+      originalData.value = []; // 清空原始数据
       replacedItems.value = new Set();
       processComplete.value = false;
 
@@ -594,6 +608,7 @@ export default {
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
       loading.value = true;
+      showResults.value = true; // 确保显示结果容器
 
       // 禁止页面滚动
       document.body.style.overflow = 'hidden';
@@ -621,55 +636,29 @@ export default {
       originalData.value = structuredData;
       processingStatus.value = `正在检查文档中的${reviewType.value === 'initial' ? '初审' : '复审'}错误...`;
 
-      // 分批处理段落
-      const batches = [];
-      for (let i = 0; i < structuredData.length; i += batchSize.value) {
-        batches.push(structuredData.slice(i, i + batchSize.value));
-      }
-      
-      totalBatches.value = batches.length;
-      currentBatch.value = 0;
-      processedBatches.value = 0;
-      
       // 启动进度模拟
       startProgressSimulation();
       
-      // 允许显示结果容器，以便在数据处理过程中展示卡片
-      showResults.value = true;
-
       try {
-        // 逐批处理段落
-        for (let i = 0; i < batches.length; i++) {
-          if (!processingRef.value) {
-            break; // 如果处理被中断，跳出循环
-          }
-          
-          currentBatch.value = i + 1;
-          processingStatus.value = `正在检查${reviewType.value === 'initial' ? '初审' : '复审'}错误... (${currentBatch.value}/${totalBatches.value})`;
-          processingBatchInfo.value = `(处理中: ${currentBatch.value}/${totalBatches.value})`;
-          
-          // 调用词语纠错功能
-          const batchCorrectionResults = await performWordCorrection(batches[i]);
-          
-          if (!processingRef.value) {
-            loading.value = false;
-            document.body.style.overflow = '';
-            return;
-          }
-          
-          // 合并批次结果，实时更新UI
-          correctionData.value = [...correctionData.value, ...batchCorrectionResults];
-          
-          // 滚动到最新的卡片
-          scrollToLastCard();
-          
-          // 重置模拟进度，更新实际进度
-          simulatedProgress.value = 0;
-          processedBatches.value++;
+        // 一次性处理所有段落，不再分批
+        // 使用流式处理API
+        const batchCorrectionResults = await performWordCorrection(structuredData);
+        
+        if (!processingRef.value) {
+          loading.value = false;
+          document.body.style.overflow = '';
+          return;
         }
         
-        // 所有批次处理完成
+        // 更新结果
+        correctionData.value = [...correctionData.value, ...batchCorrectionResults];
+        
+        // 滚动到最新的卡片
+        scrollToLastCard();
+        
+        // 所有处理完成
         processComplete.value = true;
+        progress.value = 100; // 确保进度显示100%
         processingBatchInfo.value = '';
         
         // 清除进度模拟
@@ -717,6 +706,33 @@ export default {
     const checkDocumentName = () => {
       if (isWordDocument()) {
         const currentDocName = window.Application?.ActiveDocument?.Name;
+        
+        // 检查store中的documentChanged标志
+        if (mainStore.documentChanged) {
+          // 检查文档名称是否真的变化了
+          if (activeDocumentName.value !== currentDocName) {
+            // 重置标志
+            mainStore.setDocumentChanged(false);
+            
+            // 更新文档名称
+            activeDocumentName.value = currentDocName;
+            
+            // 新文档重置所有状态
+            initialReviewCompleted.value = false;
+            secondReviewCompleted.value = false;
+            reviewType.value = 'initial';
+            canSwitchToInitial.value = true;
+            
+            // 重新开始处理流程
+            handleStartProcess();
+          } else {
+            // 文档名称没有变化，只重置标志
+            mainStore.setDocumentChanged(false);
+          }
+          return;
+        }
+        
+        // 原有的文档名称检查逻辑
         if (activeDocumentName.value !== currentDocName) {
           // 新文档重置所有状态
           activeDocumentName.value = currentDocName;

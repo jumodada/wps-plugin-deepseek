@@ -1,4 +1,4 @@
-import { submitOptimization, submitWordCorrection } from '../api/deepseek';
+import { submitOptimization, submitWordCorrection, submitStreamOptimizationWithFetch, submitStreamWordCorrection } from '../api/deepseek';
 
 // 检查是否是Word文档
 export const isWordDocument = () => {
@@ -203,6 +203,102 @@ const splitBySentences = (text, chunkSize) => {
     }
     
     return chunks;
+};
+
+// 流式优化请求
+export const retryStreamOptimization = async (params, callback) => {
+    return new Promise((resolve, reject) => {
+        let accumulatedData = '';
+        
+        submitStreamOptimizationWithFetch({
+            messages: params.messages,
+            signal: params.signal,
+            onData: (chunk, accumulated) => {
+                // 每次收到数据时调用
+                if (params.onData) {
+                    params.onData(chunk);
+                }
+                // 更新累积的数据
+                accumulatedData = accumulated;
+            },
+            onError: (error) => {
+                // 发生错误时调用
+                if (params.onError) {
+                    params.onError(error);
+                }
+                reject(error);
+            },
+            onComplete: (finalData) => {
+                // 请求完成时调用
+                const responseData = {
+                    data: {
+                        choices: [
+                            {
+                                message: {
+                                    content: finalData
+                                },
+                                finish_reason: 'stop'
+                            }
+                        ]
+                    }
+                };
+                
+                if (params.onComplete) {
+                    params.onComplete(responseData);
+                }
+                
+                resolve(responseData);
+            }
+        });
+    });
+};
+
+// 流式词语纠错请求
+export const retryStreamWordCorrection = async (params) => {
+    return new Promise((resolve, reject) => {
+        let accumulatedData = '';
+        
+        submitStreamWordCorrection({
+            messages: params.messages,
+            signal: params.signal,
+            onData: (chunk, accumulated) => {
+                // 每次收到数据时调用
+                if (params.onData) {
+                    params.onData(chunk, accumulated);
+                }
+                // 更新累积的数据
+                accumulatedData = accumulated;
+            },
+            onError: (error) => {
+                // 发生错误时调用
+                if (params.onError) {
+                    params.onError(error);
+                }
+                reject(error);
+            },
+            onComplete: (finalData) => {
+                // 请求完成时调用
+                const responseData = {
+                    data: {
+                        choices: [
+                            {
+                                message: {
+                                    content: finalData
+                                },
+                                finish_reason: 'stop'
+                            }
+                        ]
+                    }
+                };
+                
+                if (params.onComplete) {
+                    params.onComplete(responseData);
+                }
+                
+                resolve(responseData);
+            }
+        });
+    });
 };
 
 // 重试优化请求
