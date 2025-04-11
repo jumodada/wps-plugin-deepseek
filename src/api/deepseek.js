@@ -1,9 +1,9 @@
 import apiClient, { fetchStreamRequest } from '../services/request';
 
 // 聊天API的URL路径
-const CHAT_API_URL = '/api/v3/chat/completions';
+const CHAT_API_URL = '/v1/chat/completions';
 // 模型名称
-const MODEL = 'doubao-1-5-pro-32k-250115';
+const MODEL = 'qwen-max';
 
 /** temperature参数
    https://api-docs.deepseek.com/zh-cn/quick_start/parameter_settings
@@ -105,7 +105,7 @@ export const submitWordCorrection = (params) => {
       ],
       model: MODEL,
       stream: false,
-      max_tokens: 8192,
+      max_tokens: 30720,
       temperature: 0.3,
   }, {
     signal: params.signal
