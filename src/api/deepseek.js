@@ -4,6 +4,8 @@ import apiClient, { fetchStreamRequest } from '../services/request';
 const CHAT_API_URL = '/v1/chat/completions';
 // 模型名称
 const MODEL = 'qwen-max';
+// 默认最大token数
+const MAX_TOKENS = 8192;
 
 /** temperature参数
    https://api-docs.deepseek.com/zh-cn/quick_start/parameter_settings
@@ -20,7 +22,7 @@ export const submitOptimization = (params) => {
       messages: params.messages,
       model: MODEL,
       stream: false,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS,
   }, {
     signal: params.signal 
   });
@@ -33,7 +35,7 @@ export const submitStreamOptimizationWithFetch = (params) => {
       messages: params.messages,
       model: MODEL,
       stream: true,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS,
     },
     signal: params.signal,
     onData: params.onData,
@@ -48,7 +50,7 @@ export const submitStreamOptimization = (params) => {
       messages: params.messages,
       model: MODEL,
       stream: true,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS,
   }, {
     signal: params.signal,
     responseType: 'stream'
@@ -61,7 +63,7 @@ export const submitStreamFormatting = (params) => {
       messages: params.messages,
       model: MODEL,
       stream: true,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS,
   }, {
     signal: params.signal,
     responseType: 'stream'
@@ -83,7 +85,7 @@ export const generateDiffAnalysis = (params) => {
       ],
       model: MODEL,
       stream: false,
-      max_tokens: 2048,
+      max_tokens: MAX_TOKENS,
       temperature: 0.2,
   }, {
     signal: params.signal
@@ -105,7 +107,7 @@ export const submitWordCorrection = (params) => {
       ],
       model: MODEL,
       stream: false,
-      max_tokens: 30720,
+      max_tokens: MAX_TOKENS,
       temperature: 0.3,
   }, {
     signal: params.signal
@@ -119,7 +121,7 @@ export const submitStreamWordCorrection = (params) => {
       messages: params.messages,
       model: MODEL,
       stream: true,
-      max_tokens: 8192,
+      max_tokens: MAX_TOKENS,
       temperature: 0.3,
     },
     signal: params.signal,

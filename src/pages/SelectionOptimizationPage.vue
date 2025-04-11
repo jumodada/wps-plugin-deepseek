@@ -18,11 +18,15 @@
       </div>
     </div>
     
-    <div v-if="loading" class="loading-container">
-      <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
-      <div class="spinner"></div>
-      <!-- 添加停止按钮 -->
-      <button class="stop-button" @click="handleStopProcessing">停止</button>
+    <div v-if="loading" class="overlay-container">
+      <div class="progress-container">
+        <p class="processing-title">处理中</p>
+        <div class="progress-bar">
+          <div class="progress-inner" :style="{ width: `${progressPercentage}%` }"></div>
+        </div>
+        <p class="progress-percentage">{{ Math.round(progressPercentage) }}%</p>
+        <button class="stop-button" @click="handleStopProcessing">停止</button>
+      </div>
     </div>
     
     <div v-else-if="showResults" class="results-container">
@@ -84,6 +88,7 @@ import { generateDiffAnalysis } from '../api/deepseek';
 import { 
   isWordDocument, 
   retryOptimization,
+  retryStreamOptimization
 } from '../tool/optimization';
 import axios from 'axios';
 
@@ -106,6 +111,42 @@ export default {
     const textChangeDetected = ref(false); // 添加文本变化检测状态
     const newSelectionText = ref(''); // 存储新检测到的文本
     const processingCancelled = ref(false); // 添加停止处理状态
+    
+    // 添加进度条相关变量
+    const progress = ref(0);
+    const simulatedProgress = ref(0);
+    const progressInterval = ref(null);
+    
+    // 计算进度百分比
+    const progressPercentage = computed(() => {
+      // 简化计算，因为选择优化只有一个请求，使用模拟进度
+      return Math.min(progress.value + simulatedProgress.value, 100);
+    });
+    
+    // 启动模拟进度
+    const startProgressSimulation = () => {
+      // 清除之前的定时器
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+      }
+      
+      simulatedProgress.value = 0;
+      progress.value = 0;
+      
+      // 设置新的定时器，每100ms增加一点模拟进度，使进度更平滑
+      progressInterval.value = setInterval(() => {
+        // 如果正在处理且模拟进度小于95%，继续增加
+        if (processingRef.value && simulatedProgress.value < 95) {
+          // 模拟进度增量，但确保不会超过真实进度的95%
+          const increment = 0.5; // 每次增加的进度更小，使过渡更平滑
+          simulatedProgress.value += increment;
+        } else {
+          // 处理完成或取消，清除定时器
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
+      }, 100);
+    };
     
     // 计算属性 - 是否已替换
     const isReplaced = computed(() => {
@@ -440,6 +481,9 @@ export default {
 
       processingStatus.value = '正在提取选中内容...';
       
+      // 启动进度模拟
+      startProgressSimulation();
+      
       const selection = window.Application.Selection;
       
       if (!selection || !selection.Text || selection.Text.trim() === '') {
@@ -487,7 +531,7 @@ export default {
       // 重置错误消息
       errorMessage.value = '';
       
-      // 调用API进行优化
+      // 调用API进行优化 - 使用流式请求
       const params = {
         messages: [
           {
@@ -500,16 +544,29 @@ export default {
           }
         ],
         model: "qwen-plus",
-        signal: cancelTokenRef.value?.signal
+        signal: cancelTokenRef.value?.signal,
+        onData: (data) => {
+          // 可以在这里处理流式返回的每一块数据，更新进度
+          progress.value = Math.min(progress.value + 2, 95);
+        }
       };
       
       try {
-        const response = await retryOptimization(params);
+        const response = await retryStreamOptimization(params);
         
         if (!processingRef.value) {
+          // 清除进度模拟
+          if (progressInterval.value) {
+            clearInterval(progressInterval.value);
+            progressInterval.value = null;
+          }
           loading.value = false;
           return;
         }
+        
+        // 完成处理，设置进度为100%
+        progress.value = 100;
+        simulatedProgress.value = 0;
         
         if (!response?.data?.choices?.length) {
           errorMessage.value = 'API返回的数据格式不正确或为空';
@@ -589,6 +646,11 @@ export default {
           errorMessage.value = '处理失败，请稍后重试';
         }
       } finally {
+        // 清除进度模拟
+        if (progressInterval.value) {
+          clearInterval(progressInterval.value);
+          progressInterval.value = null;
+        }
         processingStatus.value = '';
         processingRef.value = false;
         loading.value = false;
@@ -617,6 +679,12 @@ export default {
       // 中断当前请求
       if (cancelTokenRef.value) {
         cancelTokenRef.value.abort();
+      }
+      
+      // 停止进度模拟
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+        progressInterval.value = null;
       }
       
       // 更新状态
@@ -654,6 +722,12 @@ export default {
         cancelTokenRef.value.abort();
       }
       
+      // 清除进度模拟
+      if (progressInterval.value) {
+        clearInterval(progressInterval.value);
+        progressInterval.value = null;
+      }
+      
       // 恢复所有样式
       restoreOriginalStyle();
     });
@@ -678,7 +752,9 @@ export default {
       // 添加停止处理相关变量
       processingCancelled,
       handleStopProcessing,
-      ignoreProcessingCancelled
+      ignoreProcessingCancelled,
+      // 添加进度相关变量
+      progressPercentage
     };
   }
 };
@@ -933,5 +1009,59 @@ export default {
 
 .stop-button:hover {
   background-color: #e84d4f;
+}
+
+/* 新增样式 */
+.overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(1px);
+}
+
+.progress-container {
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 20px;
+  width: 80%;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.processing-title {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.progress-bar {
+  height: 10px;
+  background-color: #f0f0f0;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.progress-inner {
+  height: 100%;
+  background-color: #1890ff;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.progress-percentage {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: bold;
 }
 </style>
