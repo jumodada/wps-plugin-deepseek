@@ -131,20 +131,28 @@ const xmlNavbarButtons = {
         label: '文章格式化',
         image: 'images/3.svg',
         onAction: () => {
-            const tsId = window.Application.PluginStorage.getItem('article_format_id');
-            if (!tsId) {
-                closeAllTaskPanes();
-                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/article-format');
-                window.Application.PluginStorage.setItem('article_format_id', taskPane.ID);
-                taskPane.Visible = true;
-            } else {
-                const taskPane = window.Application.GetTaskPane(tsId);
-                if (taskPane.Visible) {
-                    taskPane.Visible = false;
-                } else {
-                    closeAllTaskPanes();
-                    taskPane.Visible = true;
+            closeAllTaskPanes();
+            window.Application.ShowDialog(
+                GetUrlPath() + GetRouterHash() + '/article-format',
+                '文章格式化',
+                1000 * window.devicePixelRatio,
+                600 * window.devicePixelRatio,
+                false
+            )
+        },
+        deleteRule: (ruleName) => {
+            try {
+                const savedRules = localStorage.getItem('formattingRules');
+                if (savedRules) {
+                    const rules = JSON.parse(savedRules);
+                    const updatedRules = rules.filter(rule => rule.name !== ruleName);
+                    localStorage.setItem('formattingRules', JSON.stringify(updatedRules));
+                    return true;
                 }
+                return false;
+            } catch (error) {
+                console.error('删除规则失败:', error);
+                return false;
             }
         }
     },
