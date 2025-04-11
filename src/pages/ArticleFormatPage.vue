@@ -148,6 +148,7 @@
         <div class="action-buttons">
           <button class="save-btn">保存本组设置</button>
           <button class="delete-btn">删除本组规则</button>
+          <button class="apply-btn" @click="applyFormatting()">应用排版</button>
         </div>
       </div>
     </div>
@@ -156,6 +157,7 @@
 
 <script>
 import { ref } from 'vue';
+import { submitStreamFormatting } from '../api/deepseek';
 
 export default {
   name: 'ArticleFormatPage',
@@ -195,13 +197,125 @@ export default {
       }
     });
 
+    // 获取当前文档的XML内容
+    const getDocumentXML = () => {
+      // 假设WPS插件API提供了获取文档XML的方法
+      try {
+        if (window.Application && window.Application.ActiveDocument) {
+          // 这里需要根据实际WPS API调用适当的方法获取XML
+          // 这是一个示例，实际实现可能不同
+          return window.Application.ActiveDocument.getXML();
+        }
+        return '';
+      } catch (error) {
+        console.error('获取文档XML失败:', error);
+        return '';
+      }
+    };
+
+    // 应用格式化
+    const applyFormatting = async () => {
+      try {
+        // 获取当前文档的XML
+        const documentXML = getDocumentXML();
+        
+        // 准备发送到后端的数据
+        const formattingData = {
+          xml: documentXML,
+          ruleName: ruleName.value,
+          description: description.value,
+          margins: margins.value,
+          oddEvenPages: oddEvenPages.value,
+          is22x28: is22x28.value,
+          rules: rules.value
+        };
+        
+        // 创建消息格式
+        const messages = [
+          {
+            role: "system",
+            content: "你是一个专业的文档排版助手。"
+          },
+          {
+            role: "user",
+            content: `请根据以下规则对文档进行排版：${JSON.stringify(formattingData)}`
+          }
+        ];
+        
+        // 发送请求到后端
+        const controller = new AbortController();
+        const response = await submitStreamFormatting({
+          messages,
+          signal: controller.signal
+        });
+        
+        // 处理响应
+        if (response && response.data) {
+          // 假设后端返回了处理后的XML
+          const processedXML = response.data;
+          
+          // 插入处理后的XML
+          insertProcessedXML(processedXML);
+          
+          // 应用页面设置
+          applyPageSetup();
+        }
+      } catch (error) {
+        console.error('应用排版失败:', error);
+        alert('应用排版失败，请重试');
+      }
+    };
+    
+    // 插入处理后的XML
+    const insertProcessedXML = (xml) => {
+      try {
+        if (window.Application && window.Application.ActiveDocument) {
+          // 插入XML到文档
+          // 这是一个示例，实际实现可能不同
+          window.Application.ActiveDocument.insertXML(xml);
+        }
+      } catch (error) {
+        console.error('插入XML失败:', error);
+      }
+    };
+    
+    // 应用页面设置
+    const applyPageSetup = () => {
+      try {
+        if (window.Application && window.Application.ActiveDocument) {
+          // 设置页面边距（WPS单位是磅，1厘米约等于28.35磅）
+          window.Application.ActiveDocument.PageSetup.TopMargin = margins.value.top * 28.35;
+          window.Application.ActiveDocument.PageSetup.BottomMargin = margins.value.bottom * 28.35;
+          window.Application.ActiveDocument.PageSetup.LeftMargin = margins.value.left * 28.35;
+          window.Application.ActiveDocument.PageSetup.RightMargin = margins.value.right * 28.35;
+          
+          // 设置奇偶页码
+          if (oddEvenPages.value) {
+            window.Application.ActiveDocument.PageSetup.OddAndEvenPagesHeaderFooter = true;
+          } else {
+            window.Application.ActiveDocument.PageSetup.OddAndEvenPagesHeaderFooter = false;
+          }
+          
+          // 设置页面大小
+          if (is22x28.value) {
+            // 假设22x28指的是页面大小(厘米)
+            window.Application.ActiveDocument.PageSetup.PageWidth = 22 * 28.35;
+            window.Application.ActiveDocument.PageSetup.PageHeight = 28 * 28.35;
+          }
+        }
+      } catch (error) {
+        console.error('应用页面设置失败:', error);
+      }
+    };
+
     return {
       ruleName,
       description,
       margins,
       oddEvenPages,
       is22x28,
-      rules
+      rules,
+      applyFormatting
     };
   }
 };
@@ -366,7 +480,7 @@ th {
   justify-content: center;
 }
 
-.save-btn, .delete-btn {
+.save-btn, .delete-btn, .apply-btn {
   padding: 8px 24px;
   border: none;
   border-radius: 2px;
@@ -383,11 +497,20 @@ th {
   color: white;
 }
 
+.apply-btn {
+  background-color: #52c41a;
+  color: white;
+}
+
 .save-btn:hover {
   background-color: #40a9ff;
 }
 
 .delete-btn:hover {
   background-color: #ff7875;
+}
+
+.apply-btn:hover {
+  background-color: #73d13d;
 }
 </style> 
