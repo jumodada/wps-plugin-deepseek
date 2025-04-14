@@ -4,7 +4,7 @@
     <div v-if="processingCancelled && !loading && !documentChangeDetected" class="document-change-alert">
       <span>您已停止处理</span>
       <div class="document-change-actions">
-        <span class="document-change-action" @click="handleStartProcess">重新开始</span>
+        <span class="document-change-action" @click="handleStartProcess()">重新开始</span>
         <span class="document-change-action ignore" @click="ignoreProcessingCancelled">忽略</span>
       </div>
     </div>
@@ -368,12 +368,8 @@ export default {
 
         replacedItems.value.add(originalItem.id);
         originalStylesMap.value.delete(originalItem.id);
-        
-        // 同步文档状态
-        window.Application.ActiveDocument.Sync.PutUpdate();
-        
-        // 强制触发UI更新，但保持光标在当前段落
-        const position = result.position >= 0 ? result.position : 0;
+        // 修改这里：使用Selection.Start作为初始位置，如果没有则设为0
+        const position = window.Application.Selection.Start || 0;
         window.Application.ActiveDocument.Range(position, position).Select();
       } else {
         message.warning(`未找到原文内容相符的段落`);
@@ -842,6 +838,7 @@ export default {
       handleReplaceItem,
       handleIgnoreItem,
       goBack,
+      handleStartProcess,
       previousProcessedDoc,
       cardRefs,
       progressPercentage,
@@ -852,6 +849,7 @@ export default {
       documentChangeDetected,
       newDocumentName,
       handleReprocessDocument,
+      handleStartProcess,
       ignoreDocumentChange,
       isSameAsPreviousDoc,
       // 添加停止处理相关变量

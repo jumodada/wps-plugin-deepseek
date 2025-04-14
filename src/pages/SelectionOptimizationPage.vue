@@ -112,6 +112,7 @@ export default {
     const textChangeDetected = ref(false); // 添加文本变化检测状态
     const newSelectionText = ref(''); // 存储新检测到的文本
     const processingCancelled = ref(false); // 添加停止处理状态
+    const lastSelectionRange = ref(''); // 添加最后选择范围记录
     
     // 添加进度条相关变量
     const progress = ref(0);
@@ -311,6 +312,51 @@ export default {
       }, 300);
     };
     
+    // 检查当前选中的文本
+    const checkSelectionText = () => {
+      if (!window.Application?.Selection) {
+        return;
+      }
+      
+      const selection = window.Application.Selection;
+      const newText = selection.Text.trim();
+      
+      // 如果为空文本则忽略
+      if (!newText) {
+        return;
+      }
+      
+      // 获取当前选择范围信息，用于判断是否是新选择的文本
+      const selectionStart = selection.Range?.Start;
+      const selectionEnd = selection.Range?.End;
+      const currentSelectionRange = `${selectionStart}-${selectionEnd}`;
+      
+      // 如果选中的文本发生了变化且不为空
+      if (newText !== currentSelectionText.value && !loading.value) {
+        // 检查是否是用户重新选择了不同位置的文本
+        if (lastSelectionRange.value !== currentSelectionRange) {
+          // 重置替换状态，因为用户已经选择了新的文本
+          resetReplacedStatus();
+          
+          // 记录新文本并显示变化提示
+          newSelectionText.value = newText;
+          textChangeDetected.value = true;
+        }
+        
+        // 无论如何都更新当前选中文本
+        currentSelectionText.value = newText;
+        // 更新记录的最后选择范围
+        lastSelectionRange.value = currentSelectionRange;
+      }
+    };
+    
+    // 新增函数：重置替换状态
+    const resetReplacedStatus = () => {
+      if (optimizedItem.value) {
+        optimizedItem.value.replaced = false;
+      }
+    };
+    
     // 处理替换文本
     const handleReplaceItem = (originalTextItem, optimizedTextItem) => {
       if (isActive.value) {
@@ -329,6 +375,7 @@ export default {
       // 记录选择的范围信息
       const selectionStart = selection.Range.Start;
       const selectionEnd = selection.Range.End;
+      const currentSelectionRange = `${selectionStart}-${selectionEnd}`;
       
       // 获取原始XML
       const xml = selection.Range.WordOpenXML;
@@ -354,24 +401,21 @@ export default {
       // 同步文档
       window.Application.ActiveDocument.Sync.PutUpdate();
       
-      // 强制触发UI更新
-      window.Application.ActiveDocument.Range(0, 0).Select();
-      
-      // 尝试重新选中相同的范围区域
+      // 直接将光标定位到选中文本的起始位置或默认位置0
       try {
-        const doc = window.Application.ActiveDocument;
-        doc.Range(selectionStart, selectionEnd).Select();
+        const position = selectionStart !== undefined ? selectionStart : 0;
+        window.Application.ActiveDocument.Range(position, position).Select();
       } catch (e) {
-        console.error('无法重新选中原文本区域:', e);
+        console.error('无法将光标定位到选中位置:', e);
       }
       
-      // 替换后延时关闭结果页面并重新开始处理
+      // 更新当前选中文本和范围记录
+      currentSelectionText.value = optimizedTextItem.text;
+      lastSelectionRange.value = currentSelectionRange;
+      
+      // 替换后关闭结果页面
       setTimeout(() => {
         showResults.value = false;
-        // 在下一个 tick 重新启动处理
-        nextTick(() => {
-          handleStartProcess();
-        });
       }, 300);
     };
     
@@ -461,23 +505,6 @@ export default {
       });
       
       return true;
-    };
-    
-    // 检查当前选中的文本
-    const checkSelectionText = () => {
-      if (!window.Application?.Selection) {
-        return;
-      }
-      
-      const selection = window.Application.Selection;
-      const newText = selection.Text.trim();
-      
-      // 如果选中的文本发生了变化且不为空
-      if (newText && currentSelectionText.value !== newText && !loading.value) {
-        // 记录新文本并显示变化提示
-        newSelectionText.value = newText;
-        textChangeDetected.value = true;
-      }
     };
     
     // 设置定时任务，定期检查选中文本
@@ -851,7 +878,7 @@ export default {
       }
     };
     
-    // 忽略处理取消提示
+    // 添加忽略处理取消提示
     const ignoreProcessingCancelled = () => {
       processingCancelled.value = false;
     };
@@ -919,7 +946,9 @@ export default {
       handleStopProcessing,
       ignoreProcessingCancelled,
       // 添加进度相关变量
-      progressPercentage
+      progressPercentage,
+      // 添加最后选择范围记录
+      lastSelectionRange
     };
   }
 };
