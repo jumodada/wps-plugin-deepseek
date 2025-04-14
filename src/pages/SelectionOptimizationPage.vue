@@ -4,8 +4,8 @@
     <div v-if="processingCancelled && !loading && !textChangeDetected" class="text-change-alert">
       <span>您已停止处理</span>
       <div class="text-change-actions">
-        <span class="text-change-action" @click="handleStartProcess">重新开始</span>
-        <span class="text-change-action ignore" @click="ignoreProcessingCancelled">忽略</span>
+        <span class="text-change-action" @click="handleStartProcess()">重新开始</span>
+        <span class="text-change-action ignore" @click="ignoreProcessingCancelled()">忽略</span>
       </div>
     </div>
     
@@ -13,7 +13,7 @@
     <div v-if="textChangeDetected && !loading" class="text-change-alert">
       <span>检测到选中文本已变化</span>
       <div class="text-change-actions">
-        <span class="text-change-action" @click="handleReOptimize">重新优化</span>
+        <span class="text-change-action" @click="handleReOptimize()">重新优化</span>
         <span class="text-change-action ignore" @click="ignoreTextChange">忽略</span>
       </div>
     </div>
@@ -25,6 +25,7 @@
           <div class="progress-inner" :style="{ width: `${progressPercentage}%` }"></div>
         </div>
         <p class="progress-percentage">{{ Math.round(progressPercentage) }}%</p>
+        <p v-if="processingStatus" class="processing-status">{{ processingStatus }}</p>
         <button class="stop-button" @click="handleStopProcessing">停止</button>
       </div>
     </div>
@@ -83,7 +84,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { generateDiffAnalysis } from '../api/deepseek';
 import { 
   isWordDocument, 
@@ -128,6 +129,7 @@ export default {
       // 清除之前的定时器
       if (progressInterval.value) {
         clearInterval(progressInterval.value);
+        progressInterval.value = null;
       }
       
       simulatedProgress.value = 0;
@@ -137,10 +139,11 @@ export default {
       progressInterval.value = setInterval(() => {
         // 如果正在处理且模拟进度小于95%，继续增加
         if (processingRef.value && simulatedProgress.value < 95) {
-          // 模拟进度增量，但确保不会超过真实进度的95%
-          const increment = 0.5; // 每次增加的进度更小，使过渡更平滑
+          // 模拟进度增量，使增长曲线更平滑
+          // 开始快一些，接近目标慢一些
+          const increment = Math.max(0.1, 0.5 * (1 - simulatedProgress.value / 95));
           simulatedProgress.value += increment;
-        } else {
+        } else if (!processingRef.value || simulatedProgress.value >= 95) {
           // 处理完成或取消，清除定时器
           clearInterval(progressInterval.value);
           progressInterval.value = null;
@@ -154,17 +157,27 @@ export default {
     });
     // 计算差异展示文本
     const diffDisplay = computed(() => {
-      if (!optimizedItem?.value || !optimizedItem?.value?.originalText || !optimizedItem?.value?.text) {
+      if (!optimizedItem?.value || 
+          !optimizedItem.value.originalText || 
+          !optimizedItem.value.text || 
+          !Array.isArray(optimizedItem.value.diff)) {
         return '';
       }
       
       // 如果有diff分析结果，使用它们
-      if (optimizedItem?.value?.diff && optimizedItem?.value?.diff?.length > 0) {
-        return optimizedItem?.value?.diff?.map((diff, index) => {
+      if (optimizedItem.value.diff.length > 0) {
+        return optimizedItem.value.diff.map((diff, index) => {
+          // 健壮性检查：确保diff对象和其属性存在
+          if (!diff || typeof diff !== 'object') return '';
+          
           // 只处理JSON格式: { originText: "原文词", replacedText: "替换词" }
-          if (diff?.originText !== undefined && diff?.replacedText !== undefined) {
+          if (diff.originText !== undefined && diff.replacedText !== undefined) {
+            // 安全地获取文本值，避免undefined错误
+            const originText = String(diff.originText || '');
+            const replacedText = String(diff.replacedText || '');
+            
             // 直接展示originText和replacedText，保持原有样式和箭头符号
-            return `<div class="diff-item">${index + 1}. <span class="deleted">${diff?.originText}</span> → <span class="added">${diff.replacedText}</span></div>`;
+            return `<div class="diff-item">${index + 1}. <span class="deleted">${originText}</span> → <span class="added">${replacedText}</span></div>`;
           }
           return ''; // 忽略其他格式
         }).filter(Boolean).join('');
@@ -174,20 +187,26 @@ export default {
     });
     // 获取高亮后的优化文本
     const getHighlightedText = (optimizedItem) => {
-      if (!optimizedItem || !optimizedItem?.text || !optimizedItem?.diff || optimizedItem?.diff?.length === 0) {
+      if (!optimizedItem || 
+          !optimizedItem.text || 
+          !Array.isArray(optimizedItem.diff) || 
+          optimizedItem.diff.length === 0) {
         return optimizedItem?.text || '';
       }
       
-      let text = optimizedItem?.text;
+      let text = optimizedItem.text;
       const highlightWords = [];
       
       // 收集所有需要高亮的文本
-      optimizedItem?.diff?.forEach(diff => {
+      optimizedItem.diff.forEach(diff => {
+        // 健壮性检查
+        if (!diff || typeof diff !== 'object') return;
+        
         // 只处理JSON格式
-        if (diff?.originText !== undefined && diff?.replacedText !== undefined) {
+        if (diff.originText !== undefined && diff.replacedText !== undefined) {
           // 只对替换后的文本进行高亮处理
-          if (diff?.replacedText) {
-            highlightWords.push(diff?.replacedText);
+          if (diff.replacedText) {
+            highlightWords.push(String(diff.replacedText));
           }
         }
       });
@@ -250,18 +269,20 @@ export default {
       errorMessage.value = ''; // 清除可能的错误消息
       
       // 尝试重新获取选中的文本
-      try {
-        const selection = window.Application.Selection;
-        if (selection && selection.Text.trim() !== '') {
-          handleStartProcess();
-        } else {
-          // 如果没有选中文本，提示用户
+      nextTick(() => {
+        try {
+          const selection = window.Application.Selection;
+          if (selection && selection.Text.trim() !== '') {
+            handleStartProcess();
+          } else {
+            // 如果没有选中文本，提示用户
+            alert('请选中要优化的文本');
+          }
+        } catch (e) {
+          console.error('重新处理选中文本时出错:', e);
           alert('请选中要优化的文本');
         }
-      } catch (e) {
-        console.error('重新处理选中文本时出错:', e);
-        alert('请选中要优化的文本');
-      }
+      });
     };
     
     // 处理忽略项目
@@ -283,7 +304,11 @@ export default {
       // 延时关闭结果页面
       setTimeout(() => {
         showResults.value = false;
-      }, 500);
+        // 在下一个 tick 重新启动处理
+        nextTick(() => {
+          handleStartProcess();
+        });
+      }, 300);
     };
     
     // 处理替换文本
@@ -340,10 +365,14 @@ export default {
         console.error('无法重新选中原文本区域:', e);
       }
       
-      // 替换后延时关闭结果页面
+      // 替换后延时关闭结果页面并重新开始处理
       setTimeout(() => {
         showResults.value = false;
-      }, 500);
+        // 在下一个 tick 重新启动处理
+        nextTick(() => {
+          handleStartProcess();
+        });
+      }, 300);
     };
     
     // 替换选中文本的XML
@@ -462,11 +491,26 @@ export default {
     let selectionWatcherRef = null;
     
     // 启动处理流程
-    const handleStartProcess = async () => {
+    const handleStartProcess = async (retryCount = 0) => {
+      // 如果重试次数超过最大值，显示错误
+      const MAX_RETRIES = 2;
+      if (retryCount > MAX_RETRIES) {
+        errorMessage.value = '多次请求失败，请稍后重试';
+        showResults.value = true;
+        loading.value = false;
+        processingRef.value = false;
+        return;
+      }
+
       // 取消之前的请求
       if (cancelTokenRef.value) {
         cancelTokenRef.value.abort();
       }
+      
+      // 重置状态
+      errorMessage.value = '';
+      showResults.value = false;
+      processingStatus.value = '准备处理...';
       
       cancelTokenRef.value = new AbortController();
       processingRef.value = true;
@@ -476,6 +520,7 @@ export default {
       if (!isWordDocument()) {
         alert('无法访问Word文档，请确保文档已打开');
         loading.value = false;
+        processingRef.value = false;
         return;
       }
 
@@ -484,11 +529,21 @@ export default {
       // 启动进度模拟
       startProgressSimulation();
       
-      const selection = window.Application.Selection;
-      
-      if (!selection || !selection.Text || selection.Text.trim() === '') {
+      // 确保能获取到选中文本
+      let selection;
+      try {
+        selection = window.Application.Selection;
+        if (!selection || !selection.Text || selection.Text.trim() === '') {
+          alert('无法获取选中内容，请确保已选中文本');
+          loading.value = false;
+          processingRef.value = false;
+          return;
+        }
+      } catch (e) {
+        console.error('获取选中内容时出错:', e);
         alert('无法获取选中内容，请确保已选中文本');
         loading.value = false;
+        processingRef.value = false;
         return;
       }
       
@@ -501,7 +556,18 @@ export default {
       if (!selectedText.text) {
         alert('无法获取选中内容，请确保已选中文本');
         loading.value = false;
+        processingRef.value = false;
         return;
+      }
+
+      // 检查选中文本的长度，如果太长警告用户
+      if (selectedText.text.length > 5000) {
+        const confirm = window.confirm(`选中文本较长(${selectedText.text.length}字符)，处理可能需要较长时间，是否继续？`);
+        if (!confirm) {
+          loading.value = false;
+          processingRef.value = false;
+          return;
+        }
       }
 
       // 更新当前选中文本
@@ -521,6 +587,11 @@ export default {
         console.error('获取文档大纲失败:', error);
       }
 
+      // 截断文档大纲，避免传输过大的内容
+      if (documentOutline && documentOutline.length > 2000) {
+        documentOutline = documentOutline.substring(0, 2000) + '...';
+      }
+
       // 准备用于API的数据格式
       const dataForDeepseek = {
         paraID: selectedText.id,
@@ -528,15 +599,12 @@ export default {
         documentOutline: documentOutline  // 添加文档大纲
       };
       
-      // 重置错误消息
-      errorMessage.value = '';
-      
       // 调用API进行优化 - 使用流式请求
       const params = {
         messages: [
           {
             role: "system",
-            content: "你是一个专业的文章优化助手。请仅对文本进行词语级别的精确替换和优化，保持原文结构和主要内容不变。替换时尽量一对一替换词语，不要添加新内容，不要重写整个句子。如果判断文本不需要优化，请保持原样。你的目标是使优化后的文本与原文有最小的差异，但提高表达质量。"
+            content: "你是一个专业的文章优化助手。请仅对文本进行词语级别的精确替换和优化，保持原文结构和主要内容不变。替换时尽量一对一替换词语，不要添加新内容，不要重写整个句子。如果判断文本不需要优化，请保持原样。你的目标是使优化后的文本与原文有最小的差异，但提高表达质量、增强逻辑性，改善语法或改正错别字。只返回所需的JSON格式，不要添加任何解释。"
           },
           {
             role: "user",
@@ -544,18 +612,28 @@ export default {
           }
         ],
         model: "qwen-plus",
+        temperature: 0.2, // 降低随机性
         signal: cancelTokenRef.value?.signal,
         onData: (data) => {
-          // 可以在这里处理流式返回的每一块数据，更新进度
-          progress.value = Math.min(progress.value + 2, 95);
+          // 更新进度，但限制最大增量，确保不会太快跳到100%
+          progress.value = Math.min(progress.value + 1, 90);
+        },
+        onError: (error) => {
+          console.error('流式请求出错:', error);
+        },
+        onComplete: () => {
+          // 流式请求完成时将进度设置为95%，留5%给差异分析
+          progress.value = 95;
         }
       };
       
       try {
-        const response = await retryStreamOptimization(params);
+        processingStatus.value = '正在等待AI响应...';
         
+        // 使用try-catch包裹API调用，确保错误被捕获
+        const response = await retryStreamOptimization(params);
+        // 如果处理已被中断，直接返回
         if (!processingRef.value) {
-          // 清除进度模拟
           if (progressInterval.value) {
             clearInterval(progressInterval.value);
             progressInterval.value = null;
@@ -564,14 +642,22 @@ export default {
           return;
         }
         
-        // 完成处理，设置进度为100%
-        progress.value = 100;
-        simulatedProgress.value = 0;
-        
+        // 检查响应数据
         if (!response?.data?.choices?.length) {
+          // 重试
+          if (retryCount < MAX_RETRIES) {
+            processingStatus.value = `请求失败，正在重试(${retryCount + 1}/${MAX_RETRIES})...`;
+            console.log(`API返回为空，正在重试 ${retryCount + 1}/${MAX_RETRIES}`);
+            setTimeout(() => {
+              handleStartProcess(retryCount + 1);
+            }, 1000);
+            return;
+          }
+          
           errorMessage.value = 'API返回的数据格式不正确或为空';
-          loading.value = false;
           showResults.value = true;
+          loading.value = false;
+          processingRef.value = false;
           return;
         }
         
@@ -579,19 +665,44 @@ export default {
         
         // 解析API返回的结果
         let jsonData;
-        const jsonMatch = result.match(/(\{.*\})/s);
-        
-        if (jsonMatch) {
-          jsonData = JSON.parse(jsonMatch[1]);
-        } else {
-          jsonData = JSON.parse(result);
+        try {
+          const jsonMatch = result.match(/(\{.*\})/s);
+          
+          if (jsonMatch) {
+            jsonData = safeParseJSON(jsonMatch[1]);
+          } else {
+            jsonData = safeParseJSON(result);
+          }
+          
+          if (!jsonData) {
+            throw new Error('无法解析JSON数据');
+          }
+        } catch (parseError) {
+          console.error('解析API返回结果失败:', parseError);
+          
+          // 重试
+          if (retryCount < MAX_RETRIES) {
+            processingStatus.value = `结果解析失败，正在重试(${retryCount + 1}/${MAX_RETRIES})...`;
+            console.log(`解析失败，正在重试 ${retryCount + 1}/${MAX_RETRIES}`);
+            setTimeout(() => {
+              handleStartProcess(retryCount + 1);
+            }, 1000);
+            return;
+          }
+          
+          errorMessage.value = 'API返回结果格式错误，无法解析JSON';
+          showResults.value = true;
+          loading.value = false;
+          processingRef.value = false;
+          return;
         }
         
         // 检查返回的数据
         if (!jsonData?.paraID || !jsonData?.text) {
           errorMessage.value = 'API返回的数据格式不正确';
-          loading.value = false;
           showResults.value = true;
+          loading.value = false;
+          processingRef.value = false;
           return;
         }
         
@@ -610,30 +721,58 @@ export default {
         
         // 如果没有变化，不需要获取差异分析
         if (!hasChanges) {
+          progress.value = 100;
+          simulatedProgress.value = 0;
           showResults.value = true;
           loading.value = false;
+          processingRef.value = false;
           return;
         }
         
         // 获取差异分析
         try {
+          processingStatus.value = '生成差异分析...';
+          
           // 创建差异分析请求
           const diffResponse = await generateDiffAnalysis({
             original: selectedText.text,
             optimized: jsonData.text,
             signal: cancelTokenRef.value?.signal
           });
-          localStorage.setItem('diffResponse', JSON.stringify(diffResponse));
+          
+          // 更新进度到100%
+          progress.value = 100;
+          simulatedProgress.value = 0;
+          
           if (diffResponse?.data?.choices?.length) {
-            const diffResult = diffResponse.data.choices[0].message.content;
-            const diffArray = JSON.parse(diffResult);
-            optimizedItem.value.diff = Array.isArray(diffArray) ? diffArray : [];
+            try {
+              const diffResult = diffResponse.data.choices[0].message.content;
+              const diffArray = safeParseJSON(diffResult);
+              
+              if (Array.isArray(diffArray)) {
+                optimizedItem.value.diff = diffArray;
+              } else {
+                optimizedItem.value.diff = [];
+              }
+            } catch (diffParseError) {
+              console.error('解析差异分析结果失败:', diffParseError);
+              optimizedItem.value.diff = [];
+            }
           }
-        } catch (e) {
-          console.error('获取差异分析失败:', e);
-          optimizedItem.value.diff = [];
+        } catch (diffError) {
+          console.error('获取差异分析失败:', diffError);
+          // 差异分析失败不影响整体流程，继续显示结果
+          progress.value = 100;
+          simulatedProgress.value = 0;
+          // 确保diff是一个空数组，防止渲染错误
+          if (optimizedItem.value) {
+            optimizedItem.value.diff = [];
+          }
         }
         
+        // 最终显示结果
+        loading.value = false;
+        processingRef.value = false;
         showResults.value = true;
       } catch (error) {
         // 判断是否是取消的请求
@@ -642,19 +781,29 @@ export default {
           // 不显示错误消息
         } else {
           console.error('处理失败:', error);
-          // 只在控制台输出错误，不直接显示给用户
+          
+          // 重试
+          if (retryCount < MAX_RETRIES) {
+            processingStatus.value = `请求失败，正在重试(${retryCount + 1}/${MAX_RETRIES})...`;
+            console.log(`API请求失败，正在重试 ${retryCount + 1}/${MAX_RETRIES}`);
+            setTimeout(() => {
+              handleStartProcess(retryCount + 1);
+            }, 1000);
+            return;
+          }
+          
           errorMessage.value = '处理失败，请稍后重试';
+          processingRef.value = false;
+          loading.value = false;
+          showResults.value = true;
         }
       } finally {
-        // 清除进度模拟
+        // 确保在所有情况下都清理资源并更新状态
         if (progressInterval.value) {
           clearInterval(progressInterval.value);
           progressInterval.value = null;
         }
         processingStatus.value = '';
-        processingRef.value = false;
-        loading.value = false;
-        showResults.value = true;
       }
     };
     
@@ -670,6 +819,9 @@ export default {
         currentSelectionText.value = newSelectionText.value;
         textChangeDetected.value = false;
         showResults.value = false;
+        originalItem.value = null;
+        optimizedItem.value = null;
+        errorMessage.value = '';
         handleStartProcess();
       }
     };
@@ -691,6 +843,7 @@ export default {
       processingRef.value = false;
       loading.value = false;
       processingCancelled.value = true;
+      processingStatus.value = '';
       
       // 如果没有结果，至少显示结果容器
       if (!originalItem.value || !optimizedItem.value) {
@@ -701,6 +854,17 @@ export default {
     // 忽略处理取消提示
     const ignoreProcessingCancelled = () => {
       processingCancelled.value = false;
+    };
+    
+    // 安全地解析JSON
+    const safeParseJSON = (jsonString) => {
+      try {
+        if (!jsonString) return null;
+        return JSON.parse(jsonString);
+      } catch (e) {
+        console.error('JSON解析失败:', e);
+        return null;
+      }
     };
     
     onMounted(() => {
@@ -739,6 +903,7 @@ export default {
       optimizedItem,
       showResults,
       isActive,
+      handleStartProcess,
       isReplaced,
       diffDisplay,
       handleReplaceItem,
@@ -819,8 +984,9 @@ export default {
 }
 
 .processing-status {
-  margin-bottom: 20px;
-  color: #333;
+  margin: 10px 0 0 0;
+  color: #666;
+  font-size: 14px;
 }
 
 .spinner {
@@ -1034,6 +1200,7 @@ export default {
   max-width: 300px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   text-align: center;
+  transition: all 0.3s ease;
 }
 
 .processing-title {
@@ -1044,18 +1211,40 @@ export default {
 }
 
 .progress-bar {
-  height: 10px;
+  height: 8px;
   background-color: #f0f0f0;
-  border-radius: 5px;
-  margin-bottom: 10px;
+  border-radius: 4px;
+  margin: 15px 0;
   overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .progress-inner {
   height: 100%;
   background-color: #1890ff;
-  border-radius: 5px;
+  border-radius: 4px;
   transition: width 0.3s ease;
+  background-image: linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.2) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.2) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 30px 30px;
+  animation: progress-animation 1s linear infinite;
+}
+
+@keyframes progress-animation {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 30px 0;
+  }
 }
 
 .progress-percentage {
