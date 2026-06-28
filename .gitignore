@@ -31,3 +31,8 @@ wps-addon-build/
 .env.*.local
 .env.development
 .env.production
+
+# Python
+__pycache__/
+*.pyc
+backend/.env

@@ -3,7 +3,7 @@ import apiClient, { fetchStreamRequest } from '../services/request';
 // 聊天API的URL路径
 const CHAT_API_URL = '/v1/chat/completions';
 // 模型名称
-const MODEL = 'qwen-max';
+const MODEL = 'deepseek-chat';
 // 默认最大token数
 const MAX_TOKENS = 8192;
 

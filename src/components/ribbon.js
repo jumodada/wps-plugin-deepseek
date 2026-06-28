@@ -27,11 +27,12 @@ function GetUrl() {
 // 关闭所有任务面板
 function closeAllTaskPanes() {
     const paneIds = [
-        'article_optimization_id', 
+        'article_optimization_id',
         'article_stream_optimization_id',
-        'article_format_id', 
-        'selection_pane_id', 
-        'word_correction_id'
+        'article_format_id',
+        'selection_pane_id',
+        'word_correction_id',
+        'copilot_pane_id'
     ];
     paneIds.forEach(id => {
         const tsId = window.Application.PluginStorage.getItem(id);
@@ -177,6 +178,28 @@ const xmlNavbarButtons = {
                 }
             }
         }
+    },
+    copilot: {
+        id: 'copilot',
+        label: 'AI Copilot',
+        image: 'images/1.svg',
+        onAction: () => {
+            const tsId = window.Application.PluginStorage.getItem('copilot_pane_id');
+            if (!tsId) {
+                closeAllTaskPanes();
+                const taskPane = window.Application.CreateTaskPane(GetUrlPath() + GetRouterHash() + '/copilot');
+                window.Application.PluginStorage.setItem('copilot_pane_id', taskPane.ID);
+                taskPane.Visible = true;
+            } else {
+                const taskPane = window.Application.GetTaskPane(tsId);
+                if (taskPane.Visible) {
+                    taskPane.Visible = false;
+                } else {
+                    closeAllTaskPanes();
+                    taskPane.Visible = true;
+                }
+            }
+        }
     }
 };
 
@@ -247,29 +270,29 @@ export default {
     window.openOfficeFileFromSystemDemo = openOfficeFileFromSystemDemo
     window.InvokeFromSystemDemo = InvokeFromSystemDemo
   
-    window.Application.PluginStorage.setItem('EnableFlag', false) //往PluginStorage中设置一个标记，用于控制两个按钮的置灰
-    window.Application.PluginStorage.setItem('ApiEventFlag', false) //往PluginStorage中设置一个标记，用于控制ApiEvent的按钮label
-    window.Application = window.Application;
+    window.Application.PluginStorage.setItem('EnableFlag', false)
+    window.Application.PluginStorage.setItem('ApiEventFlag', false)
     return true
   },
   OnAction(control) {
-    xmlNavbarButtons[control.Id].onAction(control);
+    xmlNavbarButtons[control.Id]?.onAction?.(control);
+    return true;
   },
   GetImage(control) {
     const config = getConfig(control);
-    return config?.GetImage?.() ?? config?.image;
+    return config?.GetImage?.() ?? config?.image ?? '';
   },
   OnGetEnabled(control) {
     const config = getConfig(control);
-    return config?.getEnabled ? config?.getEnabled?.() : true;
+    return config?.getEnabled ? !!config.getEnabled() : true;
   },
   OnGetVisible(control) {
     const config = getConfig(control);
-    return config?.getVisible?.();
+    return config?.getVisible ? !!config.getVisible() : true;
   },
   OnGetLabel(control) {
     const config = getConfig(control);
-    return config?.label;
+    return config?.label ?? '';
   },
   OnNewDocumentApiEvent
 }
