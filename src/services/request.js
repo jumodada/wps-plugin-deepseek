@@ -13,8 +13,7 @@ import { message } from 'ant-design-vue';
 
 // 创建axios实例
 const apiClient = axios.create({
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode',
-  //baseURL: 'https://ark.cn-beijing.volces.com',
+  baseURL: import.meta.env.VITE_DEEPSEEK_API_BASEURL || 'https://api.deepseek.com',
   timeout: 1000000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json',

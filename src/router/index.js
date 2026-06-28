@@ -5,7 +5,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: '默认页',
+      redirect: '/copilot',
     },
     {
       path: '/article-optimization',
@@ -31,6 +31,11 @@ const router = createRouter({
       path: '/word-correction',
       name: '文章词语纠错',
       component: () => import('../pages/WordCorrectionPage.vue')
+    },
+    {
+      path: '/copilot',
+      name: 'AI Copilot',
+      component: () => import('../pages/CopilotPage.vue')
     },
   ]
 })
